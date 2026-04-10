@@ -60,12 +60,12 @@ For free local use with Ollama:
 
 - Keep `ASSISTANT_PROVIDER=ollama`
 - Install Ollama
-- Pull a Gemma model such as `gemma3:4b`
+- Use your installed model tag, currently `gemma4:latest`
 
 Example:
 
 ```bash
-ollama pull gemma3:4b
+ollama pull gemma4:latest
 ```
 
 For OpenAI:

@@ -148,7 +148,7 @@ class JarvisAssistant:
         self.tts_model = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
         self.voice = os.getenv("JARVIS_VOICE", "verse")
         self.ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
-        self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma3:4b")
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma4:latest")
         self.ollama_keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "5m")
         self.always_see = _env_flag("JARVIS_ALWAYS_SEE", default=True)
         self.camera_index = int(os.getenv("JARVIS_CAMERA_INDEX", DEFAULT_CAMERA_INDEX))
