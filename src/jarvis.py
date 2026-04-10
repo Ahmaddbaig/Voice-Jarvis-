@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import os
+import platform
+import re
 import tempfile
 import threading
 import time
@@ -10,6 +12,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pyttsx3
+import requests
 import sounddevice as sd
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -28,6 +32,20 @@ If the user asks for the movie voice, explain briefly that you can use a polishe
 British-style assistant voice but cannot clone or impersonate the exact voice.
 When using camera input, describe only what is visible and say when you are unsure.
 """
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _extract_base64_from_data_url(image_data_url: str) -> str:
+    match = re.match(r"^data:image/[^;]+;base64,(.+)$", image_data_url)
+    if not match:
+        raise ValueError("Unsupported image data URL.")
+    return match.group(1)
 
 
 class ContinuousVision:
@@ -114,21 +132,32 @@ class ContinuousVision:
 class JarvisAssistant:
     def __init__(self) -> None:
         load_dotenv()
-        if not os.getenv("OPENAI_API_KEY"):
-            raise RuntimeError("Set OPENAI_API_KEY in .env before running.")
+        self.provider = os.getenv("ASSISTANT_PROVIDER", "ollama").strip().lower()
+        if self.provider not in {"openai", "ollama"}:
+            raise RuntimeError("ASSISTANT_PROVIDER must be 'openai' or 'ollama'.")
+        if self.provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+            raise RuntimeError(
+                "ASSISTANT_PROVIDER is 'openai' but OPENAI_API_KEY is not set."
+            )
 
-        self.client = OpenAI()
+        self.client = OpenAI() if os.getenv("OPENAI_API_KEY") else None
         self.model = os.getenv("OPENAI_MODEL", "gpt-5.4")
         self.transcribe_model = os.getenv(
             "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe"
         )
         self.tts_model = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
         self.voice = os.getenv("JARVIS_VOICE", "verse")
+        self.ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+        self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma3:4b")
+        self.ollama_keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "5m")
         self.always_see = _env_flag("JARVIS_ALWAYS_SEE", default=True)
         self.camera_index = int(os.getenv("JARVIS_CAMERA_INDEX", DEFAULT_CAMERA_INDEX))
         self.camera_fps = float(os.getenv("JARVIS_CAMERA_FPS", DEFAULT_CAMERA_FPS))
         self.vision = ContinuousVision(self.camera_index, self.camera_fps)
         self.previous_response_id: str | None = None
+        self.history: list[dict[str, object]] = []
+        self.local_tts = pyttsx3.init()
+        self._configure_local_tts()
 
         if self.always_see:
             self.vision.start()
@@ -141,6 +170,9 @@ class JarvisAssistant:
             image_data_url = self.vision.wait_for_image_data_url()
             if image_data_url:
                 return self.ask_with_image(prompt, image_data_url)
+
+        if self.provider == "ollama":
+            return self.ask_ollama(prompt)
 
         request = {
             "model": self.model,
@@ -163,6 +195,9 @@ class JarvisAssistant:
         return self.ask_with_image(prompt, image_data_url)
 
     def ask_with_image(self, prompt: str, image_data_url: str) -> str:
+        if self.provider == "ollama":
+            return self.ask_ollama(prompt, image_data_url)
+
         request = {
             "model": self.model,
             "instructions": SYSTEM_PROMPT,
@@ -185,6 +220,34 @@ class JarvisAssistant:
         self.previous_response_id = response.id
         return response.output_text.strip()
 
+    def ask_ollama(self, prompt: str, image_data_url: str | None = None) -> str:
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages.extend(self.history[-8:])
+
+        user_message: dict[str, object] = {"role": "user", "content": prompt}
+        if image_data_url:
+            user_message["images"] = [_extract_base64_from_data_url(image_data_url)]
+        messages.append(user_message)
+
+        response = requests.post(
+            f"{self.ollama_url}/api/chat",
+            json={
+                "model": self.ollama_model,
+                "messages": messages,
+                "stream": False,
+                "keep_alive": self.ollama_keep_alive,
+            },
+            timeout=120,
+        )
+        response.raise_for_status()
+        data = response.json()
+        reply = data["message"]["content"].strip()
+
+        self.history.append({"role": "user", "content": prompt})
+        self.history.append({"role": "assistant", "content": reply})
+        self.history = self.history[-16:]
+        return reply
+
     def record_microphone(self) -> Path:
         print(f"Recording for {RECORD_SECONDS} seconds...")
         samples = sd.rec(
@@ -204,6 +267,10 @@ class JarvisAssistant:
         return path
 
     def transcribe(self, audio_path: Path) -> str:
+        if not self.client:
+            raise RuntimeError(
+                "Microphone transcription requires OPENAI_API_KEY in this version."
+            )
         with audio_path.open("rb") as audio_file:
             transcript = self.client.audio.transcriptions.create(
                 model=self.transcribe_model,
@@ -212,6 +279,11 @@ class JarvisAssistant:
         return transcript.text.strip()
 
     def speak(self, text: str) -> None:
+        if self.provider == "ollama" or not self.client:
+            self.local_tts.say(text)
+            self.local_tts.runAndWait()
+            return
+
         speech_path = Path(tempfile.gettempdir()) / "jarvis_reply.wav"
         with self.client.audio.speech.with_streaming_response.create(
             model=self.tts_model,
@@ -233,6 +305,37 @@ class JarvisAssistant:
             audio = audio.reshape(-1, channels)
         sd.play(audio, samplerate=sample_rate)
         sd.wait()
+
+    def _configure_local_tts(self) -> None:
+        voices = self.local_tts.getProperty("voices")
+        if not voices:
+            return
+
+        preferred_keywords = ["english", "en_", "en-", "gb", "uk", "british", "daniel"]
+        ranked = []
+        for voice in voices:
+            languages = []
+            for language in getattr(voice, "languages", []) or []:
+                if isinstance(language, bytes):
+                    languages.append(language.decode("utf-8", errors="ignore"))
+                else:
+                    languages.append(str(language))
+            haystack = " ".join(
+                [
+                    getattr(voice, "name", "") or "",
+                    getattr(voice, "id", "") or "",
+                    " ".join(languages),
+                ]
+            ).lower()
+            score = sum(keyword in haystack for keyword in preferred_keywords)
+            ranked.append((score, voice))
+
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        self.local_tts.setProperty("voice", ranked[0][1].id)
+        if platform.system() == "Darwin":
+            self.local_tts.setProperty("rate", 185)
+        else:
+            self.local_tts.setProperty("rate", 175)
 
     def capture_camera_frame(self) -> str:
         camera = cv2.VideoCapture(self.camera_index)
@@ -258,6 +361,9 @@ def main() -> None:
     assistant = JarvisAssistant()
     time.sleep(0.5)
     print("Jarvis prototype ready.")
+    print(f"Provider: {assistant.provider}")
+    if assistant.provider == "ollama":
+        print(f"Ollama model: {assistant.ollama_model}")
     print(f"Vision: {assistant.vision.status()}")
     print("Type a message, 'm' for microphone, 'c' for camera, 's' for status, or 'q' to quit.")
 
@@ -270,6 +376,10 @@ def main() -> None:
                 if choice.lower() == "q":
                     break
                 if choice.lower() == "s":
+                    if assistant.provider == "ollama":
+                        print(f"Provider: {assistant.provider} ({assistant.ollama_model})")
+                    else:
+                        print(f"Provider: {assistant.provider} ({assistant.model})")
                     print(f"Vision: {assistant.vision.status()}")
                     continue
 
@@ -297,13 +407,6 @@ def main() -> None:
         pass
     finally:
         assistant.close()
-
-
-def _env_flag(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 if __name__ == "__main__":

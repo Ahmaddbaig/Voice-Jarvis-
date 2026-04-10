@@ -3,3 +3,5 @@ python-dotenv>=1.0.1
 sounddevice>=0.4.7
 numpy>=1.26.4
 opencv-python>=4.10.0.84
+requests>=2.32.3
+pyttsx3>=2.98
