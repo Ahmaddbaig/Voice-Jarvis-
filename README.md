@@ -4,7 +4,7 @@ A local Python voice assistant prototype with:
 
 - Push-to-talk microphone input
 - Spoken replies
-- Optional webcam vision for questions like "what do you see?"
+- Always-on webcam vision that keeps the latest frame ready for every request
 - A polished, concise assistant persona inspired by a capable home AI, without cloning or impersonating a movie actor's exact voice
 
 ## Setup
@@ -71,9 +71,10 @@ Controls:
 
 - Type a message and press Enter for text chat.
 - Type `m` to record from the microphone.
-- Type `c` to take a webcam snapshot and ask a question about it.
+- Type `c` to ask a question directly about the live camera view.
+- Type `s` to check camera status.
 - Type `q` to quit.
 
 ## Notes
 
-This prototype records audio only when you press `m`. It uses the webcam only when you press `c`.
+This prototype records audio only when you press `m`. By default it keeps the webcam open while the app is running, and it sends the latest frame with each request so the assistant can answer with current visual context. Set `JARVIS_ALWAYS_SEE=false` in `.env` if you want the camera used only for `c` prompts.
