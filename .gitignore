@@ -3,3 +3,7 @@
 __pycache__/
 *.py[cod]
 .planning/
+
+# Phase 1 — Piper voice weights are large; don't commit
+models/piper/*.onnx
+!models/piper/.gitkeep
