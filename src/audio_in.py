@@ -347,29 +347,39 @@ class TwoStageGate:
         # 3. Transcribe in-memory (never on disk — PITFALLS.md C1)
         gate_transcript = self._whisper_transcribe_array(gate_audio)
 
-        # 4. Regex first-word confirm
-        if not _JARVIS_RE.match(gate_transcript or ""):
-            # Log the first 60 chars (the WakeLog 6-word cap will tighten further)
-            self._wake_log.log_wake(
-                "reject_gate", score, (gate_transcript or "")[:60]
-            )
-            return ("", "reject_gate")
+        # 4. Content-based decision (trust the wake-word engine for positive
+        # detection; rely on whisper + the vad_filter anti-hallucination flags
+        # for silence rejection). The old "first word must be jarvis" regex
+        # was broken because the post-wake capture starts AFTER the wake word
+        # is already over — whisper never sees "jarvis" in the captured audio.
+        #
+        # Strip any stray "jarvis" / "hey jarvis" whisper echoes from the
+        # transcript, then count the remaining substantive words:
+        #
+        #   - 0 words (silence or just-the-wake-word) → accept_gate:
+        #     Plan 05 plays the Piper "Sir?" ack and records a fresh utterance
+        #   - 1 word (fragment)                       → accept_gate:
+        #     same as above — too short to be a real command
+        #   - >= 2 words                              → accept_gate_inline:
+        #     user spoke a command inline; skip the ack, send straight to brain
+        cleaned = re.sub(
+            r"(?i)\b(hey\s+)?jarv(is|iss|es|ys)?\b[,.:;!?\- ]*",
+            " ",
+            gate_transcript or "",
+        )
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.:;!?-")
+        words = [w for w in cleaned.split() if w]
 
-        # 5. Strip the wake word + any leading "hey" prefix
-        after = _JARVIS_RE.sub("", gate_transcript).strip()
-        # Strip stray punctuation that whisper sometimes attaches to the wake word
-        after = after.lstrip(",.:;!?- ").strip()
-
-        # 6. Inline-command optimization: if the user said the command in
-        # the gate audio (>= 4 words after "jarvis"), skip the second recording.
-        if len(after.split()) >= 4:
+        if len(words) >= 2:
             self._wake_log.log_wake(
                 "accept_gate_inline", score, gate_transcript[:60]
             )
-            return (after, "accept_gate_inline")
+            return (cleaned, "accept_gate_inline")
 
-        # 7. Otherwise, ack + fresh recording (Plan 05 handles the ack)
-        self._wake_log.log_wake("accept_gate", score, gate_transcript[:60])
+        # Silence, fragment, or wake-word-only → ack + fresh recording.
+        self._wake_log.log_wake(
+            "accept_gate", score, (gate_transcript or "")[:60]
+        )
         return (None, "accept_gate")
 
     # -- internal --
@@ -381,18 +391,32 @@ class TwoStageGate:
         but takes a numpy array instead of a Path — Plan 05 keeps gate
         audio in memory only (PITFALLS.md §C1: never write voice to disk).
 
-        ``vad_filter=False`` because the audio is already VAD-bounded by
-        :class:`VadRecorder`; running whisper's internal VAD again would
-        be redundant and could clip the (already padded) edges.
+        Anti-hallucination configuration (the silence → fabricated text bug):
+
+        * ``vad_filter=True`` — whisper's own Silero-VAD pass drops near-
+          silent regions before the decoder sees them, so the model can't
+          fabricate plausible English out of room noise.
+        * ``no_speech_threshold=0.6`` — if whisper's internal no-speech
+          probability is above 60 %, the segment is emitted as empty.
+        * ``condition_on_previous_text=False`` — breaks the well-known
+          hallucination cascade where the decoder carries forward a bad
+          context into the next segment.
+        * ``language="en"`` — lock to English to skip slow, error-prone
+          language auto-detection on sub-second clips.
+
+        Empty string is returned on: whisper filtered everything as silence,
+        whisper raised, or the audio buffer was empty.
         """
         if audio is None or len(audio) == 0:
             return ""
         try:
             segments, _info = self._whisper.transcribe(
                 audio,
-                language=None,
+                language="en",
                 beam_size=1,
-                vad_filter=False,
+                vad_filter=True,
+                no_speech_threshold=0.6,
+                condition_on_previous_text=False,
             )
             return "".join(seg.text for seg in segments).strip()
         except Exception as exc:  # noqa: BLE001
