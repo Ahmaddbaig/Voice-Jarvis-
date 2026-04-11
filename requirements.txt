@@ -1,0 +1,15 @@
+openai>=1.76.0
+python-dotenv>=1.0.1
+sounddevice>=0.4.7
+numpy>=1.26.4
+opencv-python>=4.10.0.84
+requests>=2.32.3
+pyttsx3>=2.98
+faster-whisper>=1.0.0
+# Phase 1 — voice loop
+openwakeword==0.6.0
+silero-vad==6.2.1
+kokoro==0.9.4
+piper-tts==1.4.2
+soundfile>=0.12.1
+pynput==1.8.1
