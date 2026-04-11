@@ -112,10 +112,26 @@ def load_config() -> Config:
     localappdata = Path(os.environ["LOCALAPPDATA"]) / "Jarvis"
     (localappdata / "logs").mkdir(parents=True, exist_ok=True)
 
+    # Project root = parent of src/ (this file lives in src/config.py).
+    # Used to anchor any relative asset paths so the runtime works regardless
+    # of CWD (e.g. running ``python src/jarvis.py`` vs ``cd src && python jarvis.py``).
+    project_root = Path(__file__).resolve().parent.parent
+
     # Lazy import — keep ``from config import Config`` cheap.
     import openwakeword  # noqa: WPS433 (intentional local import)
 
     owww_models = Path(openwakeword.__file__).parent / "resources" / "models"
+
+    # Resolve piper voice dir against project root if it's a relative path,
+    # so ``models/piper`` works whether the user runs from project root or src/.
+    piper_dir_default = project_root / "models" / "piper"
+    piper_dir_env = os.environ.get("JARVIS_PIPER_VOICE_DIR")
+    if piper_dir_env:
+        piper_dir_path = Path(piper_dir_env)
+        if not piper_dir_path.is_absolute():
+            piper_dir_path = project_root / piper_dir_path
+    else:
+        piper_dir_path = piper_dir_default
 
     return Config(
         provider=_env_str("ASSISTANT_PROVIDER", "ollama").lower(),
@@ -142,9 +158,7 @@ def load_config() -> Config:
         vad_max_utterance_s=_env_int("JARVIS_VAD_MAX_S", 30),
         tts_voice=_env_str("JARVIS_TTS_VOICE", "bm_george"),
         kokoro_lang_code=_env_str("JARVIS_KOKORO_LANG", "b"),
-        piper_voice_dir=_env_path(
-            "JARVIS_PIPER_VOICE_DIR", Path("models/piper")
-        ),
+        piper_voice_dir=piper_dir_path,
         piper_voice_name=_env_str("JARVIS_PIPER_VOICE_NAME", "en_GB-alan-medium"),
         ack_phrase=_env_str("JARVIS_ACK_PHRASE", "Sir?"),
         input_device=(_env_str("JARVIS_INPUT_DEVICE", "") or None),
