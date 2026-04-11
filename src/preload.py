@@ -214,6 +214,37 @@ def preload_all(cfg: Config) -> PreloadedModels:
         config_path=str(piper_cfg),
     )
 
+    # [7/7] Warm up Ollama — make gemma resident in RAM with num_ctx pinned
+    # so the FIRST real turn doesn't pay the cold-load tax (5-10s on 8B Q4).
+    # Best-effort: if Ollama is down, log and continue — Phase 1 startup has
+    # already verified Ollama in the preloader's upstream callers.
+    if cfg.provider == "ollama":
+        print("  [7/7] Warming up Ollama...", flush=True)
+        try:
+            import requests as _requests
+
+            _requests.post(
+                f"{cfg.ollama_url}/api/generate",
+                json={
+                    "model": cfg.ollama_model,
+                    "prompt": "hi",
+                    "stream": False,
+                    "keep_alive": cfg.ollama_keep_alive,
+                    "options": {
+                        "num_ctx": cfg.ollama_num_ctx,
+                        "num_predict": 1,
+                    },
+                },
+                timeout=60,
+            ).raise_for_status()
+            print("    ready.", flush=True)
+        except Exception as exc:  # noqa: BLE001 — best effort
+            print(f"    warning: Ollama warmup failed: {exc}", flush=True)
+            print(
+                "    first real turn may pay the cold-load tax.",
+                flush=True,
+            )
+
     elapsed = time.perf_counter() - started
     print(f"All models loaded in {elapsed:.1f}s.", flush=True)
 

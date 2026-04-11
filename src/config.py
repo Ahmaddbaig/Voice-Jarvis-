@@ -61,7 +61,16 @@ class Config:
     provider: str = "ollama"
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "gemma4:latest"
-    ollama_keep_alive: str = "24h"  # Phase 1: pin gemma4 warm so first turn is fast
+    # "-1" keeps gemma4 resident forever; avoids the 5-10s cold-load tax every
+    # time Ollama's default 5m idle timer ticks over between turns.
+    ollama_keep_alive: str = "-1"
+    # Context window pinned explicitly (research: Ollama's default 2048 silently
+    # truncates tool schemas and long turns; 4096 is the CPU sweet spot for
+    # short voice turns — prefill cost grows super-linearly with num_ctx).
+    ollama_num_ctx: int = 4096
+    # Hard ceiling on generated tokens per turn. Gemma is chatty; this is the
+    # brake. Pair with the terse system prompt in src/jarvis.py for short replies.
+    ollama_num_predict: int = 80
     openai_model: str = "gpt-5.4"
     # --- STT (existing) ---
     whisper_model: str = "base"
@@ -69,7 +78,10 @@ class Config:
     whisper_compute_type: str = "int8"
     local_stt_enabled: bool = True
     # --- Vision (existing) ---
-    always_see: bool = True
+    # OFF by default: attaching a webcam frame to every Ollama request costs
+    # 40-130s of CPU prompt prefill per turn (per 01-LATENCY-RESEARCH.md).
+    # Use the CLI REPL's `c` key for explicit camera questions instead.
+    always_see: bool = False
     camera_index: int = 0
     camera_fps: float = 2.0
     # --- Phase 1 NEW: wake word ---
@@ -137,13 +149,15 @@ def load_config() -> Config:
         provider=_env_str("ASSISTANT_PROVIDER", "ollama").lower(),
         ollama_url=_env_str("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
         ollama_model=_env_str("OLLAMA_MODEL", "gemma4:latest"),
-        ollama_keep_alive=_env_str("OLLAMA_KEEP_ALIVE", "24h"),
+        ollama_keep_alive=_env_str("OLLAMA_KEEP_ALIVE", "-1"),
+        ollama_num_ctx=_env_int("OLLAMA_NUM_CTX", 4096),
+        ollama_num_predict=_env_int("OLLAMA_NUM_PREDICT", 80),
         openai_model=_env_str("OPENAI_MODEL", "gpt-5.4"),
         whisper_model=_env_str("JARVIS_WHISPER_MODEL", "base"),
         whisper_device=_env_str("JARVIS_WHISPER_DEVICE", "cpu"),
         whisper_compute_type=_env_str("JARVIS_WHISPER_COMPUTE_TYPE", "int8"),
         local_stt_enabled=_env_bool("JARVIS_LOCAL_STT", True),
-        always_see=_env_bool("JARVIS_ALWAYS_SEE", True),
+        always_see=_env_bool("JARVIS_ALWAYS_SEE", False),
         camera_index=_env_int("JARVIS_CAMERA_INDEX", 0),
         camera_fps=_env_float("JARVIS_CAMERA_FPS", 2.0),
         wake_model_path=_env_path(

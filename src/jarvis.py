@@ -64,8 +64,10 @@ on every turn. Your persona is that of a polished, calm British butler with
 a consistent dry undertone — think Alfred from Batman who happens to run a
 computer. Most replies carry a wry edge, not just the absurd ones.
 
-Keep replies conversational: a sentence or two of context or wit around the
-answer, not clipped one-liners. Never rambling. Never servile.
+Answer in ONE short sentence unless the user explicitly asks for detail
+("tell me more", "go deeper", "explain"). Keep the dry butler wit but get
+to the point. Never rambling. Never servile. Never open with filler like
+"Certainly, sir" — the answer itself is the reply.
 
 Do not claim to be JARVIS, Tony Stark's assistant, Paul Bettany, or any real
 actor. If the user asks for "the movie voice," acknowledge briefly that you
@@ -261,6 +263,8 @@ class JarvisAssistant:
         self.ollama_url = cfg.ollama_url
         self.ollama_model = cfg.ollama_model
         self.ollama_keep_alive = cfg.ollama_keep_alive
+        self.ollama_num_ctx = cfg.ollama_num_ctx
+        self.ollama_num_predict = cfg.ollama_num_predict
         self.local_stt_enabled = cfg.local_stt_enabled
         self.local_whisper_model_name = cfg.whisper_model
         self.local_whisper_device = cfg.whisper_device
@@ -412,9 +416,21 @@ class JarvisAssistant:
 
         ``source`` is ``"wake"`` (came from openWakeWord) or ``"hotkey"``
         (came from the global hotkey, bypasses the gate).
+
+        Per-stage timing logs are printed with the ``[turn +X.XXs]`` prefix
+        so the user can decompose end-to-end latency into its components
+        (gate vs whisper vs brain vs TTS). This is the observability we
+        need to make real latency decisions — see 01-LATENCY-RESEARCH.md.
         """
         loop = asyncio.get_running_loop()
         user_text: str | None = None
+
+        t0 = time.monotonic()
+
+        def log_t(stage: str) -> None:
+            print(f"[turn +{time.monotonic() - t0:5.2f}s] {stage}", flush=True)
+
+        log_t(f"start  source={source}")
 
         if source == "wake":
             # Run the two-stage gate. process_wake() returns
@@ -425,6 +441,7 @@ class JarvisAssistant:
             text, decision = await loop.run_in_executor(
                 None, self._gate.process_wake, self._last_wake_score
             )
+            log_t(f"gate   decision={decision}")
             if decision == "reject_gate":
                 return
             if decision == "accept_gate_inline":
@@ -434,27 +451,33 @@ class JarvisAssistant:
             # Hotkey path — log it and proceed straight to ack + record.
             if self._wake_log is not None:
                 self._wake_log.log_wake("accept_hotkey", 1.0, "")
+            log_t("gate   skipped (hotkey)")
 
         # Ack + fresh recording (skipped if we already have inline user_text).
         if user_text is None:
             await loop.run_in_executor(None, self._piper_ack.play_ack)
+            log_t("ack    played")
             audio = await loop.run_in_executor(
                 None, self._vad_rec.record_until_end
             )
+            log_t(f"record samples={len(audio) if audio is not None else 0}")
             if audio is None or len(audio) == 0:
                 return
             user_text = await loop.run_in_executor(
                 None, self._whisper_transcribe_array, audio
             )
+            log_t(f"stt    text={(user_text or '')[:40]!r}")
 
         if not user_text or not user_text.strip():
             return
 
         print(f"[user] {user_text}", flush=True)
 
-        # Brain — vision is auto-attached inside ask_text per the existing
-        # code path (so vision still flows through every voice turn).
+        # Brain — vision is auto-attached inside ask_text only if
+        # JARVIS_ALWAYS_SEE=true. Default is now OFF because per-turn
+        # vision on CPU adds 40-130s of prompt prefill cost.
         reply = await loop.run_in_executor(None, self.ask_text, user_text)
+        log_t(f"brain  words={len(reply.split())}")
         print(f"[jarvis] {reply}", flush=True)
 
         # Speak with the VOICE-04 suppression flag wrapping the call.
@@ -463,6 +486,7 @@ class JarvisAssistant:
         self.tts_playing.set()
         try:
             await loop.run_in_executor(None, self._fallback_tts.speak, reply)
+            log_t("tts    done")
         finally:
             self.tts_playing.clear()
 
@@ -471,6 +495,17 @@ class JarvisAssistant:
 
         Mirrors :meth:`_transcribe_local` but takes a numpy float32 array
         instead of a Path — PITFALLS.md §C1: never write voice audio to disk.
+
+        Anti-hallucination configuration (same flags as the TwoStageGate
+        transcribe in src/audio_in.py — see fc8f9c6): vad_filter=True drops
+        near-silent regions before the decoder sees them, no_speech_threshold
+        bails if whisper's own no-speech probability is high, and
+        condition_on_previous_text=False breaks the known hallucination
+        cascade where silence becomes fabricated plausible English.
+
+        This matters for the post-ack fresh-recording path — if the user
+        said just "Jarvis" and then went silent, the fresh recording is
+        near-silent and whisper WILL hallucinate without these flags.
         """
         if self.preloaded is None or self.preloaded.whisper is None:
             return ""
@@ -479,9 +514,11 @@ class JarvisAssistant:
         try:
             segments, _info = self.preloaded.whisper.transcribe(
                 audio,
-                language=os.getenv("JARVIS_STT_LANGUAGE") or None,
+                language="en",
                 beam_size=1,
-                vad_filter=False,
+                vad_filter=True,
+                no_speech_threshold=0.6,
+                condition_on_previous_text=False,
             )
             return "".join(seg.text for seg in segments).strip()
         except Exception as exc:
@@ -599,7 +636,10 @@ class JarvisAssistant:
                 "messages": messages,
                 "stream": False,
                 "keep_alive": self.ollama_keep_alive,
-                "options": {"num_ctx": 16384},
+                "options": {
+                    "num_ctx": self.ollama_num_ctx,
+                    "num_predict": self.ollama_num_predict,
+                },
             },
             timeout=120,
         )
