@@ -78,10 +78,13 @@ class Config:
     # truncates tool schemas and long turns; 4096 is the CPU sweet spot for
     # short voice turns — prefill cost grows super-linearly with num_ctx).
     ollama_num_ctx: int = 4096
+    ollama_num_ctx_tools: int = 16384
     # Hard ceiling on generated tokens per turn. Gemma is chatty; this is the
     # brake. Pair with the terse system prompt in src/jarvis.py for short replies.
     ollama_num_predict: int = 80
     openai_model: str = "gpt-5.4"
+    searxng_url: str = "http://localhost:8888"
+    eval_models: str = "gemma4:latest,qwen3:4b,qwen3:14b"
     # --- STT (existing) ---
     whisper_model: str = "base"
     whisper_device: str = "cpu"
@@ -161,8 +164,11 @@ def load_config() -> Config:
         ollama_model=_env_str("OLLAMA_MODEL", "gemma4:latest"),
         ollama_keep_alive=_env_duration("OLLAMA_KEEP_ALIVE", "-1m"),
         ollama_num_ctx=_env_int("OLLAMA_NUM_CTX", 4096),
+        ollama_num_ctx_tools=_env_int("OLLAMA_NUM_CTX_TOOLS", 16384),
         ollama_num_predict=_env_int("OLLAMA_NUM_PREDICT", 80),
         openai_model=_env_str("OPENAI_MODEL", "gpt-5.4"),
+        searxng_url=_env_str("SEARXNG_URL", "http://localhost:8888").rstrip("/"),
+        eval_models=_env_str("JARVIS_EVAL_MODELS", "gemma4:latest,qwen3:4b,qwen3:14b"),
         whisper_model=_env_str("JARVIS_WHISPER_MODEL", "base"),
         whisper_device=_env_str("JARVIS_WHISPER_DEVICE", "cpu"),
         whisper_compute_type=_env_str("JARVIS_WHISPER_COMPUTE_TYPE", "int8"),
