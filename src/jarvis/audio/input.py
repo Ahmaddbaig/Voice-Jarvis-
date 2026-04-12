@@ -50,7 +50,7 @@ from typing import Callable, Optional
 import numpy as np
 import sounddevice as sd
 
-from config import Config
+from jarvis.core.config import Config
 
 
 # ---------------------------------------------------------------------------

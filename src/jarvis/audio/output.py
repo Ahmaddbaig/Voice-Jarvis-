@@ -37,7 +37,7 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
-from config import Config
+from jarvis.core.config import Config
 
 
 # ---------------------------------------------------------------------------

@@ -50,6 +50,16 @@ def _env_path(key: str, default: Path) -> Path:
     return Path(v) if v else default
 
 
+def _env_duration(key: str, default: str) -> str:
+    v = os.environ.get(key)
+    if v is None or v == "":
+        return default
+    value = v.strip()
+    if all(ch in "-0123456789" for ch in value):
+        return f"{value}m"
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Frozen Config dataclass — every Phase 1 tunable lives here.
 # ---------------------------------------------------------------------------
@@ -58,12 +68,12 @@ def _env_path(key: str, default: Path) -> Path:
 @dataclass(frozen=True)
 class Config:
     # --- Brain (existing) ---
-    provider: str = "ollama"
+    provider: str = "openai"
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "gemma4:latest"
     # "-1" keeps gemma4 resident forever; avoids the 5-10s cold-load tax every
     # time Ollama's default 5m idle timer ticks over between turns.
-    ollama_keep_alive: str = "-1"
+    ollama_keep_alive: str = "-1m"
     # Context window pinned explicitly (research: Ollama's default 2048 silently
     # truncates tool schemas and long turns; 4096 is the CPU sweet spot for
     # short voice turns — prefill cost grows super-linearly with num_ctx).
@@ -146,10 +156,10 @@ def load_config() -> Config:
         piper_dir_path = piper_dir_default
 
     return Config(
-        provider=_env_str("ASSISTANT_PROVIDER", "ollama").lower(),
+        provider=_env_str("ASSISTANT_PROVIDER", "openai").lower(),
         ollama_url=_env_str("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
         ollama_model=_env_str("OLLAMA_MODEL", "gemma4:latest"),
-        ollama_keep_alive=_env_str("OLLAMA_KEEP_ALIVE", "-1"),
+        ollama_keep_alive=_env_duration("OLLAMA_KEEP_ALIVE", "-1m"),
         ollama_num_ctx=_env_int("OLLAMA_NUM_CTX", 4096),
         ollama_num_predict=_env_int("OLLAMA_NUM_PREDICT", 80),
         openai_model=_env_str("OPENAI_MODEL", "gpt-5.4"),
