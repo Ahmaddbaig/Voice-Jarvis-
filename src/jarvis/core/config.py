@@ -137,10 +137,10 @@ def load_config() -> Config:
     localappdata = Path(os.environ["LOCALAPPDATA"]) / "Jarvis"
     (localappdata / "logs").mkdir(parents=True, exist_ok=True)
 
-    # Project root = parent of src/ (this file lives in src/config.py).
-    # Used to anchor any relative asset paths so the runtime works regardless
-    # of CWD (e.g. running ``python src/jarvis.py`` vs ``cd src && python jarvis.py``).
-    project_root = Path(__file__).resolve().parent.parent
+    # Project root = parent of src/ (this file lives in src/jarvis/core/config.py).
+    # .parent = core/, .parent.parent = jarvis/, .parent.parent.parent = src/,
+    # .parent.parent.parent.parent = project root.
+    project_root = Path(__file__).resolve().parent.parent.parent.parent
 
     # Lazy import — keep ``from config import Config`` cheap.
     import openwakeword  # noqa: WPS433 (intentional local import)
