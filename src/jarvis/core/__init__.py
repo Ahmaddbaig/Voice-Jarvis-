@@ -1,4 +1,6 @@
-"""Core subsystem — config, preloader, brain, abort."""
+"""Core subsystem — config, preloader, brain, abort, audit."""
 from jarvis.core.config import Config, load_config  # noqa: F401
 from jarvis.core.preload import preload_all, PreloadedModels  # noqa: F401
 from jarvis.core.brain import Brain, BrainResponse, ToolCall  # noqa: F401
+from jarvis.core.abort import PopenRegistry, AbortController  # noqa: F401
+from jarvis.core.audit import AuditLog  # noqa: F401
