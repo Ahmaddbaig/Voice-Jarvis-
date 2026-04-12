@@ -213,3 +213,52 @@ class FallbackTTS:
         health write. Today the user just needs to see what fell over.
         """
         print(f"[TTS] {backend} failed: {exc}", file=sys.stderr, flush=True)
+
+
+# ---------------------------------------------------------------------------
+# CloudTTS — streaming OpenAI TTS (Phase 2)
+# ---------------------------------------------------------------------------
+
+
+class CloudTTS:
+    """Streaming OpenAI TTS — plays PCM audio directly as it arrives.
+
+    D-01: Streaming OpenAI TTS for provider=openai.
+    D-03: Voice configured via JARVIS_VOICE env var (default 'verse').
+    D-04: speak() is the single method — pipeline doesn't know which backend.
+
+    PCM format: 24kHz, 16-bit signed LE, mono. No WAV header.
+    """
+
+    SAMPLE_RATE = 24000
+    CHANNELS = 1
+
+    def __init__(self, client, model: str = "gpt-4o-mini-tts", voice: str = "verse"):
+        self.client = client
+        self.model = model
+        self.voice = voice
+
+    def speak(self, text: str) -> None:
+        """Stream TTS audio directly to speakers. Blocking call."""
+        import numpy as np
+        import sounddevice as sd
+
+        with self.client.audio.speech.with_streaming_response.create(
+            model=self.model,
+            voice=self.voice,
+            input=text,
+            response_format="pcm",
+        ) as response:
+            stream = sd.OutputStream(
+                samplerate=self.SAMPLE_RATE,
+                channels=self.CHANNELS,
+                dtype="int16",
+            )
+            stream.start()
+            try:
+                for chunk in response.iter_bytes(chunk_size=4096):
+                    audio_data = np.frombuffer(chunk, dtype=np.int16)
+                    stream.write(audio_data)
+            finally:
+                stream.stop()
+                stream.close()
