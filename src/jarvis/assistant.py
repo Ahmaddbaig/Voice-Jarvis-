@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import json
 import os
 import platform
 import re
@@ -34,6 +36,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import wave
 from pathlib import Path
 
@@ -48,9 +51,15 @@ from pynput import keyboard as kb
 
 from jarvis.core.config import Config, load_config
 from jarvis.core.preload import preload_all, PreloadedModels
+from jarvis.core.brain import Brain, BrainResponse, ToolCall
+from jarvis.core.abort import PopenRegistry, AbortController
+from jarvis.core.audit import AuditLog
 from jarvis.audio.input import WakeWordStream, VadRecorder, TwoStageGate
-from jarvis.audio.output import PiperAck, FallbackTTS
+from jarvis.audio.output import PiperAck, FallbackTTS, CloudTTS
 from jarvis.audio.wake_log import WakeLog
+from jarvis.tools import all_schemas, call_tool, get_tier, discover_tools
+from jarvis.tools.shell import set_popen_registry
+from jarvis.tools.search import set_searxng_url
 
 
 SAMPLE_RATE = 16_000
@@ -301,6 +310,26 @@ class JarvisAssistant:
         self._hotkey: HotkeyListener | None = None
         self._last_wake_score: float = 0.0
 
+        # ----- Phase 2 tool framework wiring -----
+        self._popen_registry = PopenRegistry()
+        self._abort_controller = AbortController(self._popen_registry)
+        db_path = cfg.localappdata_dir / "jarvis.db"
+        self._audit_log = AuditLog(db_path)
+        self._brain = Brain(cfg, self.client)
+
+        # Inject shared instances into tools that need them
+        set_popen_registry(self._popen_registry)
+        set_searxng_url(cfg.searxng_url)
+
+        # CloudTTS for OpenAI provider (D-01, D-04)
+        self._cloud_tts: CloudTTS | None = None
+        if self.client and cfg.provider == "openai":
+            self._cloud_tts = CloudTTS(
+                self.client,
+                model=self.tts_model,
+                voice=self.voice,
+            )
+
         if preloaded is not None:
             # Voice-first mode — construct the audio classes immediately so
             # they're ready when start_voice_loop() spins up the worker.
@@ -372,11 +401,19 @@ class JarvisAssistant:
             if source == "quit":
                 return
             try:
-                await self._turn_pipeline(source)
+                # Create a child task for the turn so abort can cancel it
+                turn_task = asyncio.create_task(self._turn_pipeline(source))
+                self._abort_controller.set_current_turn(turn_task)
+                await turn_task
+            except asyncio.CancelledError:
+                # Abort fired — silently end the turn (D-06)
+                pass
             except Exception as exc:
                 # Top-of-pipeline catch — single place we mop up turn errors
                 # so the loop keeps running.
                 print(f"[turn] error: {exc}", file=sys.stderr, flush=True)
+            finally:
+                self._abort_controller.clear_current_turn()
 
     def _on_wake_detected(self, score: float) -> None:
         """Wake-stream bridge callback. Runs on the asyncio loop thread.
@@ -398,18 +435,22 @@ class JarvisAssistant:
         self._turn_q.put_nowait("wake")
 
     def _on_hotkey_triggered(self) -> None:
-        """Hotkey-bridge callback. Runs on the asyncio loop thread.
-
-        Called via ``call_soon_threadsafe`` from the pynput listener thread.
-        Bypasses the wake-word two-stage gate entirely (D-05).
-        """
-        if self.tts_playing is not None and self.tts_playing.is_set():
-            return
-        if self._turn_q is None:
-            return
-        if self._turn_q.full():
-            return
-        self._turn_q.put_nowait("hotkey")
+        """Context-dependent hotkey: idle=start turn, busy=cancel turn (D-05)."""
+        if self._abort_controller.is_busy:
+            # ABORT path (D-06: silent abort with log)
+            import sounddevice as sd
+            self._abort_controller.abort(self.tts_playing, sd.stop)
+            if self._wake_log is not None:
+                self._wake_log.log_wake("abort_hotkey", 1.0, "")
+        else:
+            # START path (existing behavior)
+            if self.tts_playing is not None and self.tts_playing.is_set():
+                return
+            if self._turn_q is None:
+                return
+            if self._turn_q.full():
+                return
+            self._turn_q.put_nowait("hotkey")
 
     async def _turn_pipeline(self, source: str) -> None:
         """One full turn: gate? -> ack? -> record -> brain -> speak.
@@ -473,19 +514,99 @@ class JarvisAssistant:
 
         print(f"[user] {user_text}", flush=True)
 
-        # Brain — vision is auto-attached inside ask_text only if
-        # JARVIS_ALWAYS_SEE=true. Default is now OFF because per-turn
-        # vision on CPU adds 40-130s of prompt prefill cost.
-        reply = await loop.run_in_executor(None, self.ask_text, user_text)
-        log_t(f"brain  words={len(reply.split())}")
-        print(f"[jarvis] {reply}", flush=True)
+        # ----- Brain + Tool-Call Loop (BRAIN-06: cap N=8, duplicate detection) -----
+        turn_id = str(uuid.uuid4())
+        tools_schema = all_schemas() if discover_tools() else None
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_text},
+        ]
+        # If vision attached, include image in user message
+        if self.always_see:
+            image_url = self.vision.latest_image_data_url()
+            if image_url:
+                messages[-1] = {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_text},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                }
 
-        # Speak with the VOICE-04 suppression flag wrapping the call.
-        # The flag is checked in _on_wake_detected to drop self-trigger
-        # wake events while Kokoro is playing.
+        MAX_TOOL_CALLS = 8
+        seen_hashes: set[str] = set()
+        reply_text = ""
+
+        for iteration in range(MAX_TOOL_CALLS + 1):
+            resp = await loop.run_in_executor(None, self._brain.ask, messages, tools_schema)
+            log_t(f"brain  iter={iteration} tools={bool(resp.tool_calls)}")
+
+            if not resp.tool_calls:
+                reply_text = resp.text
+                break
+
+            # Append assistant message with tool_calls
+            assistant_msg: dict = {"role": "assistant", "content": resp.text or ""}
+            if self.cfg.provider == "openai":
+                assistant_msg["tool_calls"] = [
+                    {"id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)}}
+                    for tc in resp.tool_calls
+                ]
+            else:
+                assistant_msg["tool_calls"] = [
+                    {"function": {"name": tc.name, "arguments": tc.arguments}}
+                    for tc in resp.tool_calls
+                ]
+            messages.append(assistant_msg)
+
+            for tc in resp.tool_calls:
+                # Duplicate detection (BRAIN-06)
+                call_hash = hashlib.md5(
+                    f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True)}".encode()
+                ).hexdigest()
+
+                if call_hash in seen_hashes:
+                    result = f"[Duplicate call -- you already called {tc.name} with these arguments.]"
+                else:
+                    seen_hashes.add(call_hash)
+                    # Audit log BEFORE execution (SAFE-02)
+                    tier = get_tier(tc.name)
+                    t_start = time.monotonic()
+                    audit_id = self._audit_log.insert_pending(turn_id, tc.name, tier, tc.arguments)
+                    # Execute tool
+                    result = await loop.run_in_executor(None, call_tool, tc.name, tc.arguments)
+                    duration_ms = int((time.monotonic() - t_start) * 1000)
+                    self._audit_log.update_result(audit_id, result, duration_ms)
+
+                # SAFE-06: Wrap in untrusted_content markers
+                wrapped = f'<untrusted_content source="{tc.name}">{result}</untrusted_content>'
+
+                # Build tool result message (provider-specific)
+                if self.cfg.provider == "openai":
+                    messages.append({"role": "tool", "tool_call_id": tc.id, "content": wrapped})
+                else:
+                    messages.append({"role": "tool", "content": wrapped})
+
+            log_t(f"tools  executed={len(resp.tool_calls)}")
+        else:
+            # Loop cap reached — force text reply
+            reply_text = resp.text or "I've reached my action limit for this turn."
+
+        if not reply_text:
+            reply_text = "(no response)"
+
+        log_t(f"brain  words={len(reply_text.split())}")
+        print(f"[jarvis] {reply_text}", flush=True)
+
+        # Speak — D-04: routing pushed into speak layer
         self.tts_playing.set()
         try:
-            await loop.run_in_executor(None, self._fallback_tts.speak, reply)
+            if self._cloud_tts and self.cfg.provider == "openai":
+                await loop.run_in_executor(None, self._cloud_tts.speak, reply_text)
+            elif self._fallback_tts:
+                await loop.run_in_executor(None, self._fallback_tts.speak, reply_text)
+            else:
+                await loop.run_in_executor(None, self._speak_local, reply_text)
             log_t("tts    done")
         finally:
             self.tts_playing.clear()
@@ -525,6 +646,11 @@ class JarvisAssistant:
             print(f"[whisper] error: {exc}", file=sys.stderr, flush=True)
             return ""
 
+    def _speak_local(self, text: str) -> None:
+        """pyttsx3 local TTS fallback (used when no FallbackTTS or CloudTTS)."""
+        self.local_tts.say(text)
+        self.local_tts.runAndWait()
+
     async def _enqueue_quit(self) -> None:
         if self._turn_q is not None:
             await self._turn_q.put("quit")
@@ -559,6 +685,7 @@ class JarvisAssistant:
                 pass
             if self._worker is not None:
                 self._worker.join(timeout=5)
+        self._audit_log.close()
         self.vision.stop()
 
     # ------------------------------------------------------------------
