@@ -69,15 +69,15 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 
 ### Persistent Memory (MEMORY)
 
-- [ ] **MEMORY-01**: Conversation turns and extracted facts are stored in a local SQLite database at `%LOCALAPPDATA%\Jarvis\memory.db` with `PRAGMA journal_mode=WAL`.
-- [ ] **MEMORY-02**: Embeddings are generated locally via `sentence-transformers/all-MiniLM-L6-v2` and stored in `sqlite-vec` virtual tables (`vec_turns`, `vec_facts`).
+- [x] **MEMORY-01**: Conversation turns and extracted facts are stored in a local SQLite database at `%LOCALAPPDATA%\Jarvis\memory.db` with `PRAGMA journal_mode=WAL`.
+- [x] **MEMORY-02**: Embeddings are generated locally via `sentence-transformers/all-MiniLM-L6-v2` and stored in `sqlite-vec` virtual tables (`vec_turns`, `vec_facts`).
 - [ ] **MEMORY-03**: Profile facts (identity, preferences) are loaded into the system prompt on every turn — Jarvis recognizes the user across sessions without needing to search.
 - [ ] **MEMORY-04**: Semantic recall queries fetch the top-K=5 most relevant prior turns/facts for each user message and inject them as context; injection is hard-capped at 2 KB of tokens.
-- [ ] **MEMORY-05**: Retrieved items include similarity scores; anything below 0.7 is tagged "uncertain" in the prompt so the model hedges.
-- [ ] **MEMORY-06**: Facts are typed (`profile`, `preference`, `state`, `event`, `identity`) with per-type expiry (e.g. `state` facts expire after 90 days).
-- [ ] **MEMORY-07**: Supersession detection — a new contradicting fact marks the old one `superseded_by`, so stale preferences don't linger.
+- [x] **MEMORY-05**: Retrieved items include similarity scores; anything below 0.7 is tagged "uncertain" in the prompt so the model hedges.
+- [x] **MEMORY-06**: Facts are typed (`profile`, `preference`, `state`, `event`, `identity`) with per-type expiry (e.g. `state` facts expire after 90 days).
+- [x] **MEMORY-07**: Supersession detection — a new contradicting fact marks the old one `superseded_by`, so stale preferences don't linger.
 - [ ] **MEMORY-08**: `remember`, `recall`, and `forget` are exposed as tools so Jarvis can explicitly persist and redact facts on request.
-- [ ] **MEMORY-09**: PII (emails, phone numbers, credit cards) is redacted by regex *before* content is embedded.
+- [x] **MEMORY-09**: PII (emails, phone numbers, credit cards) is redacted by regex *before* content is embedded.
 - [ ] **MEMORY-10**: In-process `self.history` rolling window is retired; SQLite is the single source of conversation truth.
 
 ### Process & Reliability (PROC)
@@ -205,15 +205,15 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | ACT-PERSONAL-06 | Phase 9 | Pending |
 | ACT-PERSONAL-07 | Phase 9 | Pending |
 | ACT-COMM-01 | Phase 10 | Pending |
-| MEMORY-01 | Phase 4 | Pending |
-| MEMORY-02 | Phase 4 | Pending |
+| MEMORY-01 | Phase 4 | Complete |
+| MEMORY-02 | Phase 4 | Complete |
 | MEMORY-03 | Phase 4 | Pending |
 | MEMORY-04 | Phase 4 | Pending |
-| MEMORY-05 | Phase 4 | Pending |
-| MEMORY-06 | Phase 4 | Pending |
-| MEMORY-07 | Phase 4 | Pending |
+| MEMORY-05 | Phase 4 | Complete |
+| MEMORY-06 | Phase 4 | Complete |
+| MEMORY-07 | Phase 4 | Complete |
 | MEMORY-08 | Phase 4 | Pending |
-| MEMORY-09 | Phase 4 | Pending |
+| MEMORY-09 | Phase 4 | Complete |
 | MEMORY-10 | Phase 4 | Pending |
 | PROC-01 | Phase 5 | Pending |
 | PROC-02 | Phase 5 | Pending |

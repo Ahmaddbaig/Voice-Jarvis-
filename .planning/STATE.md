@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-04-13T00:13:17.199Z"
+status: executing
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-04-13T01:08:38.857Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 10
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_plans: 15
+  completed_plans: 13
+  percent: 87
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** Jarvis takes real actions for its user, by voice, and stays useful with no internet connection.
-**Current focus:** Phase 03 — PC Control Tools
+**Current focus:** Phase 04 — Persistent Memory
 
 ## Current Position
 
-Phase: 03 (PC Control Tools) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 04 (Persistent Memory) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-13
 
 Progress: [░░░░░░░░░░] 0%
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P01 | 117 | 3 tasks | 3 files |
 | Phase 03 P03 | 110s | 2 tasks | 3 files |
 | Phase 03 P02 | 127s | 3 tasks | 3 files |
+| Phase 04 P01 | 230s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Pillow added as explicit dep for screenshot JPEG encoding; take_screenshot returns data:image/jpeg;base64 URL triggering Plan 01 vision pipeline
 - [Phase 03]: Single manage_window tool with Literal action enum (focus/minimize/close) over 3 separate tools
 - [Phase 03]: set_volume (tier 1, pycaw COM) and media_control (tier 0, ctypes SendInput) as separate tools
+- [Phase 04]: MemoryStore embeds facts as 'key: value' for better semantic matching; superseded_by=-1 is manual-forget sentinel
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T00:13:17.193Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-04-13T01:08:38.853Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
