@@ -1,0 +1,16 @@
+# SearXNG metasearch engine for Jarvis web search (Phase 8)
+# Start: docker compose -f docker/docker-compose.yml up -d
+# Stop:  docker compose -f docker/docker-compose.yml down
+version: "3.7"
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: jarvis-searxng
+    ports:
+      - "8888:8080"
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8888

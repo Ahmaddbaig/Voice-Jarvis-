@@ -1,0 +1,27 @@
+# SearXNG settings for Jarvis -- JSON API enabled, no telemetry
+use_default_settings: true
+
+server:
+  secret_key: "jarvis-searxng-local-only-a7f3b9c2e1d4"
+  limiter: false
+  image_proxy: false
+  bind_address: "0.0.0.0"
+
+search:
+  formats:
+    - html
+    - json
+  default_lang: en
+  safe_search: 0
+  autocomplete: ""
+
+categories_as_tabs:
+  general:
+  news:
+  science:
+  it:
+
+enabled_plugins:
+  - 'Hash plugin'
+  - 'Self Information'
+  - 'Tracker URL remover'
