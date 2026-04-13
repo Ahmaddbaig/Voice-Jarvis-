@@ -55,6 +55,7 @@ from jarvis.core.brain import Brain, BrainResponse, ToolCall
 from jarvis.core.abort import PopenRegistry, AbortController
 from jarvis.core.component import ComponentRegistry
 from jarvis.core.audit import AuditLog
+from jarvis.core.timing import TimingLog
 from jarvis.core.memory import MemoryStore
 from jarvis.audio.input import WakeWordStream, VadRecorder, TwoStageGate
 from jarvis.audio.output import PiperAck, FallbackTTS, CloudTTS
@@ -343,6 +344,8 @@ class JarvisAssistant:
         self._abort_controller = AbortController(self._popen_registry)
         db_path = cfg.localappdata_dir / "jarvis.db"
         self._audit_log = AuditLog(db_path)
+        self._timing_log = TimingLog(db_path)
+        self._tts_cancel = threading.Event()
         self._brain = Brain(cfg, self.client)
 
         # Phase 4: persistent memory
@@ -462,14 +465,21 @@ class JarvisAssistant:
         """Wake-stream bridge callback. Runs on the asyncio loop thread.
 
         Called via ``call_soon_threadsafe`` from the PortAudio callback in
-        :class:`WakeWordStream`. Implements VOICE-04 (D-12): drop wake
-        events while ``tts_playing`` is set, log them as ``suppressed_tts``.
+        :class:`WakeWordStream`. During TTS playback, suppresses low-confidence
+        detections (self-trigger) but allows high-confidence through as
+        barge-in (D-01, D-02). The barge_in_threshold is configurable.
         """
         self._last_wake_score = score
         if self.tts_playing is not None and self.tts_playing.is_set():
+            if score < self.cfg.barge_in_threshold:
+                # Low confidence during TTS = almost certainly self-trigger
+                if self._wake_log is not None:
+                    self._wake_log.log_wake("suppressed_tts", score, "")
+                return
+            # High confidence during TTS = likely real user barge-in (D-01)
+            self._tts_cancel.set()
             if self._wake_log is not None:
-                self._wake_log.log_wake("suppressed_tts", score, "")
-            return
+                self._wake_log.log_wake("barge_in", score, "")
         if self._turn_q is None:
             return
         if self._turn_q.full():
@@ -482,6 +492,7 @@ class JarvisAssistant:
         if self._abort_controller.is_busy:
             # ABORT path (D-06: silent abort with log)
             import sounddevice as sd
+            self._tts_cancel.set()
             self._abort_controller.abort(self.tts_playing, sd.stop)
             if self._wake_log is not None:
                 self._wake_log.log_wake("abort_hotkey", 1.0, "")
@@ -509,10 +520,16 @@ class JarvisAssistant:
         loop = asyncio.get_running_loop()
         user_text: str | None = None
 
+        turn_id = str(uuid.uuid4())[:8]
         t0 = time.monotonic()
 
         def log_t(stage: str) -> None:
-            print(f"[turn +{time.monotonic() - t0:5.2f}s] {stage}", flush=True)
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            print(f"[turn +{elapsed_ms / 1000:5.2f}s] {stage}", flush=True)
+            if self._timing_log:
+                loop.run_in_executor(
+                    None, self._timing_log.insert, turn_id, stage.split()[0], elapsed_ms
+                )
 
         log_t(f"start  source={source}")
 
@@ -589,7 +606,6 @@ class JarvisAssistant:
             self._memory.store_turn("user", user_text, self._session_id)
 
         # ----- Brain + Tool-Call Loop (BRAIN-06: cap N=8, duplicate detection) -----
-        turn_id = str(uuid.uuid4())
         tools_schema = all_schemas() if discover_tools() else None
         messages = self._build_messages(user_text)
         # If vision attached, include image in user message
@@ -722,12 +738,17 @@ class JarvisAssistant:
             self._memory.store_turn("assistant", reply_text, self._session_id)
 
         # Speak — D-04: routing pushed into speak layer
+        self._tts_cancel.clear()
         self.tts_playing.set()
         try:
             if self._cloud_tts and self.cfg.provider == "openai":
-                await loop.run_in_executor(None, self._cloud_tts.speak, reply_text)
+                await loop.run_in_executor(
+                    None, self._cloud_tts.speak, reply_text, self._tts_cancel
+                )
             elif self._fallback_tts:
-                await loop.run_in_executor(None, self._fallback_tts.speak, reply_text)
+                await loop.run_in_executor(
+                    None, self._fallback_tts.speak, reply_text, self._tts_cancel
+                )
             else:
                 await loop.run_in_executor(None, self._speak_local, reply_text)
             log_t("tts    done")
@@ -936,6 +957,8 @@ class JarvisAssistant:
         if self._memory:
             self._memory.close()
         self._audit_log.close()
+        if self._timing_log:
+            self._timing_log.close()
         self.vision.stop()
 
     # ------------------------------------------------------------------

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import io
 import sys
+import threading
 import wave
 from typing import Optional
 
@@ -51,6 +52,44 @@ FAST_ACK_PHRASES = [
     "Working on it, sir.",
     "On it, sir.",
 ]
+
+
+def play_cancellable(
+    audio: np.ndarray,
+    sr: int,
+    cancel: threading.Event,
+    chunk_ms: int = 50,
+) -> bool:
+    """Play audio with cancellation support via sd.OutputStream (D-03).
+
+    Returns True if playback completed, False if cancelled or errored.
+    Audio is written in small chunks (~50ms) with the cancel event checked
+    between each write, giving ~50ms cancellation latency.
+    """
+    if audio.ndim == 1:
+        audio = audio.reshape(-1, 1)
+    chunk_samples = int(sr * chunk_ms / 1000)
+
+    stream = sd.OutputStream(
+        samplerate=sr, channels=audio.shape[1], dtype=audio.dtype
+    )
+    stream.start()
+    try:
+        offset = 0
+        while offset < len(audio):
+            if cancel.is_set():
+                stream.abort()
+                return False
+            end = min(offset + chunk_samples, len(audio))
+            stream.write(audio[offset:end])
+            offset = end
+        stream.stop()
+        return True
+    except Exception:
+        stream.abort()
+        return False
+    finally:
+        stream.close()
 
 
 # ---------------------------------------------------------------------------
@@ -102,19 +141,21 @@ class PiperAck:
         self._cached_ack = data
         self._cached_sr = int(sr)
 
-    def play_ack(self) -> None:
-        """Play the pre-cached ack blob.
+    def play_ack(self, cancel: threading.Event | None = None) -> None:
+        """Play the pre-cached ack blob via cancellable OutputStream (D-03).
 
-        Uses blocking playback so the caller (Plan 05) knows the audio is
-        finished before its suppression flag clears — without that the
-        wake word could re-trigger mid-playback. Catches and logs any
-        PortAudio / playback errors so a flaky output device cannot crash
-        the loop.
+        Uses :func:`play_cancellable` so barge-in / abort can stop playback
+        within ~50ms. Catches and logs any PortAudio / playback errors so a
+        flaky output device cannot crash the loop.
         """
         if self._cached_ack is None:
             return
         try:
-            sd.play(self._cached_ack, samplerate=self._cached_sr, blocking=True)
+            play_cancellable(
+                self._cached_ack,
+                self._cached_sr,
+                cancel or threading.Event(),
+            )
         except Exception as exc:  # noqa: BLE001 — playback must never crash the loop
             print(f"[TTS] PiperAck play error: {exc}", file=sys.stderr, flush=True)
 
@@ -186,31 +227,32 @@ class FallbackTTS:
         self._kokoro_broken = False
         self._piper_broken = False
 
-    def speak(self, text: str) -> None:
+    def speak(self, text: str, cancel: threading.Event | None = None) -> None:
         """Speak ``text`` using the first working backend in the chain.
 
         Empty / whitespace input is a no-op. Each backend is wrapped in its
         own try/except so a failure cleanly falls through to the next tier.
         ``speak()`` itself never raises — the voice loop must keep running
         even if every TTS backend is dead.
+
+        When *cancel* is set, playback stops within ~50ms (D-03).
         """
         if not text or not text.strip():
             return
 
+        _cancel = cancel or threading.Event()
+
         # Tier 1: Kokoro bm_george (primary)
         if self._kokoro is not None and not self._kokoro_broken:
             try:
-                # KPipeline returns a generator yielding (graphemes, phonemes,
-                # audio) per sentence. MUST iterate to actually trigger
-                # phonemize+synthesize — calling self._kokoro(...) alone is
-                # lazy and synthesizes nothing.
                 for _gs, _ps, audio in self._kokoro(
                     text,
                     voice=self._cfg.tts_voice,
                     speed=1.0,
                     split_pattern=r"\n+",
                 ):
-                    sd.play(audio, samplerate=24_000, blocking=True)
+                    if not play_cancellable(audio, 24_000, _cancel):
+                        return  # cancelled
                 return
             except Exception as exc:  # noqa: BLE001 — fall through to next tier
                 self._kokoro_broken = True
@@ -220,7 +262,8 @@ class FallbackTTS:
         if self._piper_ack is not None and not self._piper_broken:
             try:
                 audio, sr = self._piper_ack.synthesize(text)
-                sd.play(audio, samplerate=sr, blocking=True)
+                if not play_cancellable(audio, sr, _cancel):
+                    return  # cancelled
                 return
             except Exception as exc:  # noqa: BLE001 — fall through to next tier
                 self._piper_broken = True
@@ -272,8 +315,11 @@ class CloudTTS:
         self.model = model
         self.voice = voice
 
-    def speak(self, text: str) -> None:
-        """Stream TTS audio directly to speakers. Blocking call."""
+    def speak(self, text: str, cancel: threading.Event | None = None) -> None:
+        """Stream TTS audio directly to speakers with cancel support (D-03).
+
+        When *cancel* is set, playback aborts immediately without draining.
+        """
         import numpy as np
         import sounddevice as sd
 
@@ -291,8 +337,13 @@ class CloudTTS:
             stream.start()
             try:
                 for chunk in response.iter_bytes(chunk_size=4096):
+                    if cancel and cancel.is_set():
+                        stream.abort()
+                        return
                     audio_data = np.frombuffer(chunk, dtype=np.int16)
                     stream.write(audio_data)
-            finally:
                 stream.stop()
+            except Exception:
+                stream.abort()
+            finally:
                 stream.close()
