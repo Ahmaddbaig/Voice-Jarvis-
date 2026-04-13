@@ -88,7 +88,7 @@ def create_jarvis_icon(size: int = 64) -> Image.Image:
 if __name__ == "__main__":
     cfg = load_config()
     models, registry = preload_all(cfg)
-    assistant = JarvisAssistant(cfg, preloaded=models)
+    assistant = JarvisAssistant(cfg, preloaded=models, registry=registry)
 
     _listening = True
 
