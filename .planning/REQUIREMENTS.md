@@ -105,11 +105,11 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 
 ### Performance (PERF)
 
-- [ ] **PERF-01**: Every pipeline stage (wake → VAD → STT → brain → TTS) logs timing into a local SQLite table every turn.
+- [x] **PERF-01**: Every pipeline stage (wake → VAD → STT → brain → TTS) logs timing into a local SQLite table every turn.
 - [ ] **PERF-02**: Target end-to-end latency for short replies is ≤1.5 s wake-to-first-audio, measured and committed in a dashboard.
 - [ ] **PERF-03**: Piper acknowledgment voice speaks a short "Certainly." / "Right away." within 400 ms while Kokoro synthesizes the real reply, masking perceived latency.
 - [ ] **PERF-04**: Kokoro synthesizes TTS sentence-by-sentence — sentence N+1 is generated while sentence N is still playing, with a short crossfade to mask the boundary.
-- [ ] **PERF-05**: All heavy models (openWakeWord, silero-vad, whisper, Kokoro, sentence-transformer, Ollama keep-alive) are preloaded at startup — the first user interaction is not delayed by lazy initialization.
+- [x] **PERF-05**: All heavy models (openWakeWord, silero-vad, whisper, Kokoro, sentence-transformer, Ollama keep-alive) are preloaded at startup — the first user interaction is not delayed by lazy initialization.
 - [ ] **PERF-06**: Saying "stop" or "cancel" during a running action invokes the abort rail (SAFE-05), not just the TTS interrupt.
 
 ## v2 Requirements
@@ -232,11 +232,11 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | SAFE-05 | Phase 2 | Complete |
 | SAFE-06 | Phase 2 | Complete |
 | SAFE-07 | Phase 8 | Pending |
-| PERF-01 | Phase 6 | Pending |
+| PERF-01 | Phase 6 | Complete |
 | PERF-02 | Phase 6 | Pending |
 | PERF-03 | Phase 6 | Pending |
 | PERF-04 | Phase 6 | Pending |
-| PERF-05 | Phase 6 | Pending |
+| PERF-05 | Phase 6 | Complete |
 | PERF-06 | Phase 6 | Pending |
 
 **Coverage:**

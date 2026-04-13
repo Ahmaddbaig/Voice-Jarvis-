@@ -118,9 +118,9 @@ Plans:
   5. For any reply longer than one sentence, sentence N+1 starts playing immediately after sentence N without an audible gap at the boundary.
 **Plans**: 3 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [x] 06-01-PLAN.md — Wave 1: OutputStream migration for FallbackTTS + cancel event + TimingLog SQLite + fast-ack phrase pool + config fields (PERF-01, PERF-05)
+- [ ] 06-02-PLAN.md — Wave 2: Barge-in self-trigger discrimination + voice abort keywords + fast-ack concurrent with brain (VOICE-07, PERF-03, PERF-06)
+- [ ] 06-03-PLAN.md — Wave 3: Kokoro sentence streaming + crossfade + latency target verification (PERF-02, PERF-04)
 
 ### Phase 7: Files & Documents
 **Goal**: Jarvis can read, summarize, search, write, and delete files within allow-listed directories. PDFs become first-class via pymupdf4llm. This is the first phase that introduces Tier 2 (destructive) tools, so the dry-run preview rail and the post-read quarantine (SAFE-03, SAFE-04) land here — Tier 2 tools are blocked on any turn that already pulled in external content, and every Tier 2 call writes a dry-run preview before acting.
@@ -196,7 +196,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 3. PC Control Tools | 3/3 | Complete   | 2026-04-13 |
 | 4. Persistent Memory | 3/3 | Complete   | 2026-04-13 |
 | 5. Background Process + Crash Plumbing + Graceful Degradation | 0/3 | Not started | - |
-| 6. Latency Pass + Barge-In + Voice Abort | 0/TBD | Not started | - |
+| 6. Latency Pass + Barge-In + Voice Abort | 0/3 | Not started | - |
 | 7. Files & Documents | 0/TBD | Not started | - |
 | 8. Web Search & Page Fetch | 0/TBD | Not started | - |
 | 9. Outlook Email & Calendar | 0/TBD | Not started | - |
