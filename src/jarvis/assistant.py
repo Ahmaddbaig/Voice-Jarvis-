@@ -578,14 +578,38 @@ class JarvisAssistant:
                     duration_ms = int((time.monotonic() - t_start) * 1000)
                     self._audit_log.update_result(audit_id, result, duration_ms)
 
-                # SAFE-06: Wrap in untrusted_content markers
-                wrapped = f'<untrusted_content source="{tc.name}">{result}</untrusted_content>'
+                # Image result detection (ACT-PC-05: vision-as-tool)
+                is_image = result.startswith("data:image/")
 
-                # Build tool result message (provider-specific)
-                if self.cfg.provider == "openai":
-                    messages.append({"role": "tool", "tool_call_id": tc.id, "content": wrapped})
+                if is_image:
+                    # Screenshots are our own output — no untrusted_content wrapping needed
+                    if self.cfg.provider == "openai":
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": [
+                                {"type": "text", "text": "Screenshot captured:"},
+                                {"type": "image_url", "image_url": {"url": result}},
+                            ],
+                        })
+                    else:
+                        # Ollama: images field on a user message (tool role + images is unreliable)
+                        # First add a minimal tool result to satisfy the message protocol
+                        messages.append({"role": "tool", "content": "Screenshot captured."})
+                        # Then inject the image in a follow-up user message that Ollama will process
+                        b64_data = result.split(",", 1)[1]  # Strip data:image/jpeg;base64, prefix
+                        messages.append({
+                            "role": "user",
+                            "content": "Describe what you see in this screenshot.",
+                            "images": [b64_data],
+                        })
                 else:
-                    messages.append({"role": "tool", "content": wrapped})
+                    # SAFE-06: Wrap in untrusted_content markers (normal text results)
+                    wrapped = f'<untrusted_content source="{tc.name}">{result}</untrusted_content>'
+                    if self.cfg.provider == "openai":
+                        messages.append({"role": "tool", "tool_call_id": tc.id, "content": wrapped})
+                    else:
+                        messages.append({"role": "tool", "content": wrapped})
 
             log_t(f"tools  executed={len(resp.tool_calls)}")
         else:
