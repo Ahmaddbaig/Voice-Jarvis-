@@ -24,3 +24,6 @@ sentence-transformers>=5.0.0
 # Phase 5 — background process + crash plumbing
 pystray>=0.19.5
 winotify>=1.1.0
+# Phase 7 — file & document tools
+pymupdf4llm>=0.0.17
+send2trash>=1.8.3
