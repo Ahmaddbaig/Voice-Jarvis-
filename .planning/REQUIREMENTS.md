@@ -40,11 +40,11 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 
 ### Actions — Files & Documents (ACT-FILE)
 
-- [ ] **ACT-FILE-01**: Jarvis can read text and markdown files from allow-listed directories (home, Desktop, Downloads, Documents, explicit project dirs).
-- [ ] **ACT-FILE-02**: Jarvis can read and summarize PDFs via pymupdf4llm.
-- [ ] **ACT-FILE-03**: Jarvis can write and modify files in allow-listed directories (Tier 2 — path-checked).
-- [ ] **ACT-FILE-04**: `delete_file` routes through `send2trash` so deletions land in the Recycle Bin, not permanent removal.
-- [ ] **ACT-FILE-05**: Jarvis can search files by filename and glob within allow-listed directories.
+- [x] **ACT-FILE-01**: Jarvis can read text and markdown files from allow-listed directories (home, Desktop, Downloads, Documents, explicit project dirs).
+- [x] **ACT-FILE-02**: Jarvis can read and summarize PDFs via pymupdf4llm.
+- [x] **ACT-FILE-03**: Jarvis can write and modify files in allow-listed directories (Tier 2 — path-checked).
+- [x] **ACT-FILE-04**: `delete_file` routes through `send2trash` so deletions land in the Recycle Bin, not permanent removal.
+- [x] **ACT-FILE-05**: Jarvis can search files by filename and glob within allow-listed directories.
 - [x] **ACT-FILE-06**: File-path arguments are validated against an allow/denylist (denylist includes Windows system dirs, `.venv`, `.git`, `*.env`, credential stores).
 
 ### Actions — Web & Knowledge (ACT-WEB)
@@ -188,11 +188,11 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | ACT-PC-04 | Phase 3 | Complete |
 | ACT-PC-05 | Phase 3 | Complete |
 | ACT-PC-06 | Phase 3 | Complete |
-| ACT-FILE-01 | Phase 7 | Pending |
-| ACT-FILE-02 | Phase 7 | Pending |
-| ACT-FILE-03 | Phase 7 | Pending |
-| ACT-FILE-04 | Phase 7 | Pending |
-| ACT-FILE-05 | Phase 7 | Pending |
+| ACT-FILE-01 | Phase 7 | Complete |
+| ACT-FILE-02 | Phase 7 | Complete |
+| ACT-FILE-03 | Phase 7 | Complete |
+| ACT-FILE-04 | Phase 7 | Complete |
+| ACT-FILE-05 | Phase 7 | Complete |
 | ACT-FILE-06 | Phase 7 | Complete |
 | ACT-WEB-01 | Phase 8 | Pending |
 | ACT-WEB-02 | Phase 8 | Pending |

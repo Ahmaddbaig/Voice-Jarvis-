@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Persistent Memory** - SQLite + sqlite-vec cross-session memory; profile facts in system prompt, semantic recall per turn (completed 2026-04-13)
 - [ ] **Phase 5: Background Process + Crash Plumbing + Graceful Degradation** - pythonw + pystray tray + autostart; stdout/stderr plumbing so crashes are never silent
 - [ ] **Phase 6: Latency Pass + Barge-In + Voice Abort** - Per-stage timing, Piper fast-ack, sentence-streaming TTS, barge-in, "stop"/"cancel" as abort
-- [ ] **Phase 7: Files & Documents** - Read/write/search files and PDFs with path allow-list, send2trash deletes, Tier 2 guards
+- [x] **Phase 7: Files & Documents** - Read/write/search files and PDFs with path allow-list, send2trash deletes, Tier 2 guards (completed 2026-04-13)
 - [ ] **Phase 8: Web Search & Page Fetch** - SearXNG in Docker + trafilatura with URL allow-list constrained to current-turn results
 - [ ] **Phase 9: Outlook Email & Calendar** - Inbox read, draft-only send, calendar read/create via Outlook COM
 - [ ] **Phase 10: Multi-Step Agent Loop + External Chat** - Compose prior tools into multi-step chains; post to one external chat webhook
@@ -135,7 +135,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 07-01-PLAN.md — Wave 1: pip deps (pymupdf4llm, send2trash) + file_access.py allow/denylist + SAFE-03 dry-run in call_tool + SAFE-04 quarantine flag (ACT-FILE-06, SAFE-03, SAFE-04)
-- [ ] 07-02-PLAN.md — Wave 2: 5 file tools in files.py (read_file, read_pdf, write_file, delete_file, search_files) (ACT-FILE-01..05)
+- [x] 07-02-PLAN.md — Wave 2: 5 file tools in files.py (read_file, read_pdf, write_file, delete_file, search_files) (ACT-FILE-01..05)
 
 ### Phase 8: Web Search & Page Fetch
 **Goal**: Jarvis can answer current-information questions by searching the web through a self-hosted SearXNG instance in Docker and extracting the main content of a result page via trafilatura. The URL allow-list is hard-constrained: `fetch_page` only accepts URLs that SearXNG returned in the current turn — no freeform URL fetching, ever. The component degrades cleanly when Docker is down.
@@ -196,7 +196,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 4. Persistent Memory | 3/3 | Complete   | 2026-04-13 |
 | 5. Background Process + Crash Plumbing + Graceful Degradation | 0/3 | Not started | - |
 | 6. Latency Pass + Barge-In + Voice Abort | 0/3 | Not started | - |
-| 7. Files & Documents | 1/2 | In Progress|  |
+| 7. Files & Documents | 2/2 | Complete   | 2026-04-13 |
 | 8. Web Search & Page Fetch | 0/TBD | Not started | - |
 | 9. Outlook Email & Calendar | 0/TBD | Not started | - |
 | 10. Multi-Step Agent Loop + External Chat | 0/TBD | Not started | - |
