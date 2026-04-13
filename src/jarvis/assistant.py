@@ -31,6 +31,7 @@ import hashlib
 import json
 import os
 import platform
+import random
 import re
 import sys
 import tempfile
@@ -657,7 +658,27 @@ class JarvisAssistant:
 
         for iteration in range(MAX_TOOL_CALLS + 1):
             try:
-                resp = await loop.run_in_executor(None, self._brain.ask, messages, tools_schema)
+                # First brain call -- with fast-ack for local path (D-11)
+                if iteration == 0:
+                    use_fast_ack = (
+                        self.cfg.provider != "openai"
+                        and self._piper_ack is not None
+                        and self._piper_ack.fast_ack_pool
+                    )
+                    if use_fast_ack:
+                        log_t("ack    fast_ack_start")
+                        resp = await self._run_brain_with_fast_ack(
+                            messages, tools_schema, loop, log_t
+                        )
+                        log_t("ack    fast_ack_done")
+                    else:
+                        resp = await loop.run_in_executor(
+                            None, self._brain.ask, messages, tools_schema
+                        )
+                else:
+                    resp = await loop.run_in_executor(
+                        None, self._brain.ask, messages, tools_schema
+                    )
             except Exception as exc:
                 # Degradation: brain unavailable (D-13)
                 log_t(f"brain  FAILED: {exc}")
@@ -789,6 +810,51 @@ class JarvisAssistant:
             if (self._memory and reply_text and user_text
                     and reply_text != "(no response)"):
                 asyncio.ensure_future(self._extract_and_store_facts(user_text, reply_text))
+
+    # ------------------------------------------------------------------
+    # Fast-ack concurrent with brain (D-09, D-11, PERF-03)
+    # ------------------------------------------------------------------
+
+    async def _run_brain_with_fast_ack(self, messages, schemas, loop, log_t):
+        """Run brain.ask() concurrently with a Piper fast-ack phrase (D-09).
+
+        The fast-ack plays while the brain generates, masking latency.
+        When the brain returns, the ack is cancelled before real TTS starts.
+        """
+        from jarvis.audio.output import play_cancellable
+
+        cancel_ack = threading.Event()
+        pool = self._piper_ack.fast_ack_pool
+
+        if not pool:
+            # No ack available, just run brain
+            return await loop.run_in_executor(None, self._brain.ask, messages, schemas)
+
+        phrase_audio, phrase_sr = random.choice(pool)
+
+        async def play_ack():
+            self.tts_playing.set()
+            try:
+                await loop.run_in_executor(
+                    None, play_cancellable, phrase_audio, phrase_sr, cancel_ack, 50
+                )
+            finally:
+                self.tts_playing.clear()
+
+        async def run_brain():
+            resp = await loop.run_in_executor(None, self._brain.ask, messages, schemas)
+            cancel_ack.set()  # stop ack if still playing
+            return resp
+
+        ack_task = asyncio.create_task(play_ack())
+        brain_result = await run_brain()
+        # Ensure ack task finishes before we start real TTS
+        cancel_ack.set()
+        try:
+            await ack_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        return brain_result
 
     # ------------------------------------------------------------------
     # Memory-augmented message builder (D-07, D-08, MEMORY-03, MEMORY-04)
