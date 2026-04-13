@@ -68,6 +68,10 @@ from jarvis.tools.memory_tools import set_memory_store
 
 SAMPLE_RATE = 16_000
 RECORD_SECONDS = 5
+
+# Voice abort keywords (D-05, D-06, PERF-06) — checked after STT, before brain call.
+# Simple string match, no LLM needed.
+ABORT_KEYWORDS = frozenset({"stop", "cancel", "abort", "nevermind", "never mind"})
 DEFAULT_CAMERA_INDEX = 0
 DEFAULT_CAMERA_FPS = 2.0
 
@@ -470,16 +474,22 @@ class JarvisAssistant:
         barge-in (D-01, D-02). The barge_in_threshold is configurable.
         """
         self._last_wake_score = score
+
         if self.tts_playing is not None and self.tts_playing.is_set():
+            # DURING TTS: self-trigger vs user-trigger discrimination (D-02)
             if score < self.cfg.barge_in_threshold:
                 # Low confidence during TTS = almost certainly self-trigger
                 if self._wake_log is not None:
-                    self._wake_log.log_wake("suppressed_tts", score, "")
+                    self._wake_log.log_wake("suppressed_self_trigger", score, "")
                 return
             # High confidence during TTS = likely real user barge-in (D-01)
+            # Fire abort on the current turn (stops TTS within ~200ms via cancel event)
             self._tts_cancel.set()
+            self._abort_controller.abort(self.tts_playing, sd.stop)
             if self._wake_log is not None:
                 self._wake_log.log_wake("barge_in", score, "")
+            # Fall through to enqueue a new turn
+
         if self._turn_q is None:
             return
         if self._turn_q.full():
@@ -600,6 +610,19 @@ class JarvisAssistant:
             return
 
         print(f"[user] {user_text}", flush=True)
+
+        # Voice abort check (D-05, D-06, PERF-06)
+        if user_text.strip().lower() in ABORT_KEYWORDS:
+            if self._abort_controller.is_busy:
+                # Active turn running: fire abort rail
+                self._tts_cancel.set()
+                self._abort_controller.abort(self.tts_playing, sd.stop)
+                log_t("abort  voice_abort")
+                return
+            else:
+                # Nothing running: tell the user (D-07)
+                user_text = "I said stop but nothing is running right now."
+                # Falls through to brain.ask() which will reply naturally
 
         # Store user turn in memory DB
         if self._memory:
