@@ -80,7 +80,8 @@ def call_tool(name: str, arguments: dict) -> str:
         result = td.fn(**arguments)
         # Ensure result is a string and capped at 4KB
         result_str = str(result) if result is not None else "(no output)"
-        if len(result_str) > 4096:
+        # Image data URLs (screenshots) must not be truncated — they're 50-200KB of base64
+        if not result_str.startswith("data:image/") and len(result_str) > 4096:
             result_str = result_str[:4096] + f"\n...[truncated, was {len(str(result))} chars]"
         return result_str
     except Exception as exc:
