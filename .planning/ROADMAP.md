@@ -102,9 +102,9 @@ Plans:
   5. From the tray menu, user clicks Quit and the process exits cleanly, releasing the mic and closing the DB.
 **Plans**: 3 plans
 Plans:
-- [x] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [x] 05-01-PLAN.md — Wave 1: pip deps (pystray, winotify) + Component protocol + ComponentRegistry + 5 subsystem wrappers + health checks in preload_all
+- [ ] 05-02-PLAN.md — Wave 2: jarvis.pyw (crash plumbing + pystray tray + watchdog) + install_autostart.ps1
+- [ ] 05-03-PLAN.md — Wave 3: graceful degradation matrix wired into _turn_pipeline + component status updates + registry passed to assistant
 
 ### Phase 6: Latency Pass + Barge-In + Voice Abort
 **Goal**: The pipeline is now functionally complete end-to-end, so this phase is a dedicated tuning + UX wave. Every stage (wake -> VAD -> STT -> brain -> TTS) logs timing to SQLite every turn. Piper speaks a sub-400ms "Certainly" fast-ack while Kokoro is still synthesizing the real reply. Kokoro synthesizes sentence-by-sentence with a crossfade so the second sentence starts while the first is still playing. Barge-in works mid-speech. Saying "stop" or "cancel" during a tool call invokes the full abort rail, not just TTS.
@@ -195,7 +195,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 2. Brain Refactor + Tool Framework + Abort Rail | 1/4 | In Progress|  |
 | 3. PC Control Tools | 3/3 | Complete   | 2026-04-13 |
 | 4. Persistent Memory | 3/3 | Complete   | 2026-04-13 |
-| 5. Background Process + Crash Plumbing + Graceful Degradation | 0/TBD | Not started | - |
+| 5. Background Process + Crash Plumbing + Graceful Degradation | 0/3 | Not started | - |
 | 6. Latency Pass + Barge-In + Voice Abort | 0/TBD | Not started | - |
 | 7. Files & Documents | 0/TBD | Not started | - |
 | 8. Web Search & Page Fetch | 0/TBD | Not started | - |
