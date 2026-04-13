@@ -394,6 +394,12 @@ class JarvisAssistant:
             self._gate = TwoStageGate(
                 cfg, self._vad_rec, preloaded.whisper, self._wake_log
             )
+            # PERF-05 / D-17: verify all models resident at startup
+            _ack_count = len(self._piper_ack.fast_ack_pool) if self._piper_ack else 0
+            print(
+                f"[preload] All models resident. Fast-ack pool: {_ack_count} phrases.",
+                flush=True,
+            )
 
     # ------------------------------------------------------------------
     # Voice-loop lifecycle (asyncio worker + wake stream + hotkey)
@@ -784,14 +790,17 @@ class JarvisAssistant:
         # Speak — D-04: routing pushed into speak layer
         self._tts_cancel.clear()
         self.tts_playing.set()
+        log_t("tts_first_audio")  # PERF-02: marks when real reply audio begins
         try:
             if self._cloud_tts and self.cfg.provider == "openai":
+                # CloudTTS streams natively -- no sentence streaming needed (D-15)
                 await loop.run_in_executor(
                     None, self._cloud_tts.speak, reply_text, self._tts_cancel
                 )
             elif self._fallback_tts:
+                # Use sentence streaming for multi-sentence replies (PERF-04)
                 await loop.run_in_executor(
-                    None, self._fallback_tts.speak, reply_text, self._tts_cancel
+                    None, self._fallback_tts.speak_streaming, reply_text, self._tts_cancel
                 )
             else:
                 await loop.run_in_executor(None, self._speak_local, reply_text)
