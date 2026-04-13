@@ -61,6 +61,7 @@ from jarvis.audio.wake_log import WakeLog
 from jarvis.tools import all_schemas, call_tool, get_tier, discover_tools
 from jarvis.tools.shell import set_popen_registry
 from jarvis.tools.search import set_searxng_url
+from jarvis.tools.memory_tools import set_memory_store
 
 
 SAMPLE_RATE = 16_000
@@ -357,6 +358,8 @@ class JarvisAssistant:
         # Inject shared instances into tools that need them
         set_popen_registry(self._popen_registry)
         set_searxng_url(cfg.searxng_url)
+        if self._memory is not None:
+            set_memory_store(self._memory)
 
         # CloudTTS for OpenAI provider (D-01, D-04)
         self._cloud_tts: CloudTTS | None = None
