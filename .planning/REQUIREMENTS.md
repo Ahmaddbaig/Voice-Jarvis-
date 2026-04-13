@@ -15,7 +15,7 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 - [ ] **VOICE-04**: Jarvis does not trigger on its own voice — wake detections are suppressed while TTS is playing, and the mic auto-mutes when another app holds an exclusive audio session.
 - [ ] **VOICE-05**: Jarvis speaks in a high-quality local voice (Kokoro `bm_george`/`bm_daniel`) that runs fully offline; Piper is installed as a tested fallback and as the fast-acknowledgment voice.
 - [ ] **VOICE-06**: The startup sequence verifies `espeak-ng` is on PATH and fails loudly (not silently) if Kokoro's dependency is missing.
-- [ ] **VOICE-07**: Jarvis can be interrupted mid-sentence while speaking (barge-in) — starting a new wake-word activation aborts the current TTS playback cleanly.
+- [x] **VOICE-07**: Jarvis can be interrupted mid-sentence while speaking (barge-in) — starting a new wake-word activation aborts the current TTS playback cleanly.
 - [ ] **VOICE-08**: System-prompt persona is "polished, calm desktop butler with dry wit" — terse by default, never impersonates a real person or character.
 
 ### Brain & Tool-Use Framework (BRAIN)
@@ -107,10 +107,10 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 
 - [x] **PERF-01**: Every pipeline stage (wake → VAD → STT → brain → TTS) logs timing into a local SQLite table every turn.
 - [ ] **PERF-02**: Target end-to-end latency for short replies is ≤1.5 s wake-to-first-audio, measured and committed in a dashboard.
-- [ ] **PERF-03**: Piper acknowledgment voice speaks a short "Certainly." / "Right away." within 400 ms while Kokoro synthesizes the real reply, masking perceived latency.
+- [x] **PERF-03**: Piper acknowledgment voice speaks a short "Certainly." / "Right away." within 400 ms while Kokoro synthesizes the real reply, masking perceived latency.
 - [ ] **PERF-04**: Kokoro synthesizes TTS sentence-by-sentence — sentence N+1 is generated while sentence N is still playing, with a short crossfade to mask the boundary.
 - [x] **PERF-05**: All heavy models (openWakeWord, silero-vad, whisper, Kokoro, sentence-transformer, Ollama keep-alive) are preloaded at startup — the first user interaction is not delayed by lazy initialization.
-- [ ] **PERF-06**: Saying "stop" or "cancel" during a running action invokes the abort rail (SAFE-05), not just the TTS interrupt.
+- [x] **PERF-06**: Saying "stop" or "cancel" during a running action invokes the abort rail (SAFE-05), not just the TTS interrupt.
 
 ## v2 Requirements
 
@@ -172,7 +172,7 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | VOICE-04 | Phase 1 | Pending |
 | VOICE-05 | Phase 1 | Pending |
 | VOICE-06 | Phase 1 | Pending |
-| VOICE-07 | Phase 6 | Pending |
+| VOICE-07 | Phase 6 | Complete |
 | VOICE-08 | Phase 1 | Pending |
 | BRAIN-01 | Phase 2 | Complete |
 | BRAIN-02 | Phase 2 | Complete |
@@ -234,10 +234,10 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | SAFE-07 | Phase 8 | Pending |
 | PERF-01 | Phase 6 | Complete |
 | PERF-02 | Phase 6 | Pending |
-| PERF-03 | Phase 6 | Pending |
+| PERF-03 | Phase 6 | Complete |
 | PERF-04 | Phase 6 | Pending |
 | PERF-05 | Phase 6 | Complete |
-| PERF-06 | Phase 6 | Pending |
+| PERF-06 | Phase 6 | Complete |
 
 **Coverage:**
 - v1 requirements: 72 total

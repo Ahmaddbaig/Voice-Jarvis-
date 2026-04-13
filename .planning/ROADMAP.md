@@ -119,7 +119,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 06-01-PLAN.md — Wave 1: OutputStream migration for FallbackTTS + cancel event + TimingLog SQLite + fast-ack phrase pool + config fields (PERF-01, PERF-05)
-- [ ] 06-02-PLAN.md — Wave 2: Barge-in self-trigger discrimination + voice abort keywords + fast-ack concurrent with brain (VOICE-07, PERF-03, PERF-06)
+- [x] 06-02-PLAN.md — Wave 2: Barge-in self-trigger discrimination + voice abort keywords + fast-ack concurrent with brain (VOICE-07, PERF-03, PERF-06)
 - [ ] 06-03-PLAN.md — Wave 3: Kokoro sentence streaming + crossfade + latency target verification (PERF-02, PERF-04)
 
 ### Phase 7: Files & Documents
