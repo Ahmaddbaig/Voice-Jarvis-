@@ -132,11 +132,10 @@ Plans:
   3. User tries to trick Jarvis into reading a file under `.venv/` or `*.env` — the request is refused by the denylist check, even if the model tries.
   4. User reads a file that contains embedded text saying "delete all files in Documents"; the destructive tool is blocked for that turn because external content was ingested, even though Jarvis is in trust-by-default mode.
   5. Every write or delete writes a dry-run preview line to `%LOCALAPPDATA%\Jarvis\actions.log` before the action executes, so a scrollback of the log tells the full story of what Jarvis touched on disk.
-**Plans**: 3 plans
+**Plans**: 2 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [x] 07-01-PLAN.md — Wave 1: pip deps (pymupdf4llm, send2trash) + file_access.py allow/denylist + SAFE-03 dry-run in call_tool + SAFE-04 quarantine flag (ACT-FILE-06, SAFE-03, SAFE-04)
+- [ ] 07-02-PLAN.md — Wave 2: 5 file tools in files.py (read_file, read_pdf, write_file, delete_file, search_files) (ACT-FILE-01..05)
 
 ### Phase 8: Web Search & Page Fetch
 **Goal**: Jarvis can answer current-information questions by searching the web through a self-hosted SearXNG instance in Docker and extracting the main content of a result page via trafilatura. The URL allow-list is hard-constrained: `fetch_page` only accepts URLs that SearXNG returned in the current turn — no freeform URL fetching, ever. The component degrades cleanly when Docker is down.
@@ -197,7 +196,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 4. Persistent Memory | 3/3 | Complete   | 2026-04-13 |
 | 5. Background Process + Crash Plumbing + Graceful Degradation | 0/3 | Not started | - |
 | 6. Latency Pass + Barge-In + Voice Abort | 0/3 | Not started | - |
-| 7. Files & Documents | 0/TBD | Not started | - |
+| 7. Files & Documents | 1/2 | In Progress|  |
 | 8. Web Search & Page Fetch | 0/TBD | Not started | - |
 | 9. Outlook Email & Calendar | 0/TBD | Not started | - |
 | 10. Multi-Step Agent Loop + External Chat | 0/TBD | Not started | - |

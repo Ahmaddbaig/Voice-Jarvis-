@@ -45,7 +45,7 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 - [ ] **ACT-FILE-03**: Jarvis can write and modify files in allow-listed directories (Tier 2 — path-checked).
 - [ ] **ACT-FILE-04**: `delete_file` routes through `send2trash` so deletions land in the Recycle Bin, not permanent removal.
 - [ ] **ACT-FILE-05**: Jarvis can search files by filename and glob within allow-listed directories.
-- [ ] **ACT-FILE-06**: File-path arguments are validated against an allow/denylist (denylist includes Windows system dirs, `.venv`, `.git`, `*.env`, credential stores).
+- [x] **ACT-FILE-06**: File-path arguments are validated against an allow/denylist (denylist includes Windows system dirs, `.venv`, `.git`, `*.env`, credential stores).
 
 ### Actions — Web & Knowledge (ACT-WEB)
 
@@ -97,8 +97,8 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 
 - [x] **SAFE-01**: Tools are classified into three tiers (0 = read-only, 1 = reversible writes, 2 = destructive/irreversible) and the tier is declared as a decorator argument, not an afterthought.
 - [x] **SAFE-02**: Every tool call (all tiers) is written to a `tool_calls` audit log *before* execution.
-- [ ] **SAFE-03**: Tier 2 tools write a dry-run preview to `actions.log` before acting.
-- [ ] **SAFE-04**: Tier 2 tools are *blocked* during any conversation turn that has pulled in external content (email body, PDF contents, web page) — prevents prompt injection from triggering destructive actions on the same turn.
+- [x] **SAFE-03**: Tier 2 tools write a dry-run preview to `actions.log` before acting.
+- [x] **SAFE-04**: Tier 2 tools are *blocked* during any conversation turn that has pulled in external content (email body, PDF contents, web page) — prevents prompt injection from triggering destructive actions on the same turn.
 - [x] **SAFE-05**: A global hotkey (registered via `pynput.keyboard.GlobalHotKeys`) aborts the current turn — cancels the asyncio task, terminates all registered child Popens, and stops any TTS playback.
 - [x] **SAFE-06**: A tool result payload sent back to the LLM is wrapped in `<untrusted_content source="...">...</untrusted_content>` markers so the model treats it as data, not instructions.
 - [ ] **SAFE-07**: Outbound URLs for `fetch_page` are constrained to the SearXNG result set of the current turn — no freeform URL fetching.
@@ -193,7 +193,7 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | ACT-FILE-03 | Phase 7 | Pending |
 | ACT-FILE-04 | Phase 7 | Pending |
 | ACT-FILE-05 | Phase 7 | Pending |
-| ACT-FILE-06 | Phase 7 | Pending |
+| ACT-FILE-06 | Phase 7 | Complete |
 | ACT-WEB-01 | Phase 8 | Pending |
 | ACT-WEB-02 | Phase 8 | Pending |
 | ACT-WEB-03 | Phase 8 | Pending |
@@ -227,8 +227,8 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | PROC-10 | Phase 2 | Complete |
 | SAFE-01 | Phase 2 | Complete |
 | SAFE-02 | Phase 2 | Complete |
-| SAFE-03 | Phase 7 | Pending |
-| SAFE-04 | Phase 7 | Pending |
+| SAFE-03 | Phase 7 | Complete |
+| SAFE-04 | Phase 7 | Complete |
 | SAFE-05 | Phase 2 | Complete |
 | SAFE-06 | Phase 2 | Complete |
 | SAFE-07 | Phase 8 | Pending |
