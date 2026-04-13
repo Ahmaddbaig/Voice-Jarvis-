@@ -1,7 +1,7 @@
 """volume -- Tier 0/1 tools for system volume control and media key simulation."""
 import ctypes
 import logging
-from ctypes import POINTER, cast, wintypes
+from ctypes import wintypes
 from typing import Literal
 
 from jarvis.tools._registry import tool
@@ -57,13 +57,13 @@ def _press_key(vk_code: int) -> None:
 
 
 def _get_volume_interface():
-    """Activate and return the IAudioEndpointVolume COM interface."""
-    from comtypes import CLSCTX_ALL
-    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+    """Return the IAudioEndpointVolume COM interface via pycaw's wrapper."""
+    from pycaw.pycaw import AudioUtilities
 
-    devices = AudioUtilities.GetSpeakers()
-    interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-    return cast(interface, POINTER(IAudioEndpointVolume))
+    device = AudioUtilities.GetSpeakers()
+    # Modern pycaw wraps the COM plumbing — EndpointVolume is already
+    # the activated IAudioEndpointVolume interface. No Activate() call needed.
+    return device.EndpointVolume
 
 
 @tool(tier=1, description="Set system master volume to an absolute level (0-100).")

@@ -582,25 +582,31 @@ class JarvisAssistant:
                 is_image = result.startswith("data:image/")
 
                 if is_image:
-                    # Screenshots are our own output — no untrusted_content wrapping needed
+                    # Screenshots are our own output — no untrusted_content wrapping.
+                    # Neither OpenAI nor Ollama support image arrays on role:"tool"
+                    # messages reliably. The pattern that works for both providers:
+                    #   1. Add a text-only tool result to satisfy the protocol
+                    #   2. Inject a follow-up user message carrying the actual image
                     if self.cfg.provider == "openai":
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tc.id,
+                            "content": "Screenshot captured. See the image below.",
+                        })
+                        messages.append({
+                            "role": "user",
                             "content": [
-                                {"type": "text", "text": "Screenshot captured:"},
+                                {"type": "text", "text": "Here is the screenshot. Describe what you see:"},
                                 {"type": "image_url", "image_url": {"url": result}},
                             ],
                         })
                     else:
-                        # Ollama: images field on a user message (tool role + images is unreliable)
-                        # First add a minimal tool result to satisfy the message protocol
+                        # Ollama: images field on a user message
                         messages.append({"role": "tool", "content": "Screenshot captured."})
-                        # Then inject the image in a follow-up user message that Ollama will process
                         b64_data = result.split(",", 1)[1]  # Strip data:image/jpeg;base64, prefix
                         messages.append({
                             "role": "user",
-                            "content": "Describe what you see in this screenshot.",
+                            "content": "Here is the screenshot. Describe what you see:",
                             "images": [b64_data],
                         })
                 else:
