@@ -31,9 +31,9 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 
 ### Actions — PC Control (ACT-PC)
 
-- [ ] **ACT-PC-01**: Jarvis can launch applications by name ("open Spotify", "launch VS Code") via `subprocess` + Start-Menu shortcut lookup.
-- [ ] **ACT-PC-02**: Jarvis can focus, minimize, and close application windows using pywinauto + pywin32 (with `AttachThreadInput` workaround for focus steal).
-- [ ] **ACT-PC-03**: Jarvis can control system volume and media keys (play/pause/next/previous/volume up/down/mute).
+- [x] **ACT-PC-01**: Jarvis can launch applications by name ("open Spotify", "launch VS Code") via `subprocess` + Start-Menu shortcut lookup.
+- [x] **ACT-PC-02**: Jarvis can focus, minimize, and close application windows using pywinauto + pywin32 (with `AttachThreadInput` workaround for focus steal).
+- [x] **ACT-PC-03**: Jarvis can control system volume and media keys (play/pause/next/previous/volume up/down/mute).
 - [x] **ACT-PC-04**: Jarvis can read and write the system clipboard.
 - [x] **ACT-PC-05**: Jarvis can capture the current screen (full screen or focused window) as an image and feed it into a vision-as-tool call.
 - [x] **ACT-PC-06**: Jarvis can run arbitrary shell commands via `subprocess.Popen` with `CREATE_NO_WINDOW`, 30-second default timeout, 4 KB output cap, and a cancellable Popen registry tied to the abort rail.
@@ -182,9 +182,9 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | BRAIN-06 | Phase 2 | Complete |
 | BRAIN-07 | Phase 2 | Complete |
 | BRAIN-08 | Phase 2 | Complete |
-| ACT-PC-01 | Phase 3 | Pending |
-| ACT-PC-02 | Phase 3 | Pending |
-| ACT-PC-03 | Phase 3 | Pending |
+| ACT-PC-01 | Phase 3 | Complete |
+| ACT-PC-02 | Phase 3 | Complete |
+| ACT-PC-03 | Phase 3 | Complete |
 | ACT-PC-04 | Phase 3 | Complete |
 | ACT-PC-05 | Phase 3 | Complete |
 | ACT-PC-06 | Phase 3 | Complete |

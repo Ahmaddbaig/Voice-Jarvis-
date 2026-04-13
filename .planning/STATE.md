@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-04-13T00:13:09.843Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-04-13T00:13:17.199Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 10
@@ -79,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Fresh Brain per scenario, graceful model skip, 7 scenarios for eval harness
 - [Phase 03]: Image results (data:image/) bypass 4KB truncation in call_tool; OpenAI uses image_url content blocks, Ollama uses follow-up user message with images field
 - [Phase 03]: Pillow added as explicit dep for screenshot JPEG encoding; take_screenshot returns data:image/jpeg;base64 URL triggering Plan 01 vision pipeline
+- [Phase 03]: Single manage_window tool with Literal action enum (focus/minimize/close) over 3 separate tools
+- [Phase 03]: set_volume (tier 1, pycaw COM) and media_control (tier 0, ctypes SendInput) as separate tools
 
 ### Pending Todos
 
@@ -93,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T00:12:59.153Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-04-13T00:13:17.193Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None

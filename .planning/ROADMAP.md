@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Voice Loop Upgrade** - Wake word, VAD-bounded recording, Kokoro TTS, async refactor — hands-free chatbot with a pleasant voice
 - [ ] **Phase 2: Brain Refactor + Tool Framework + Abort Rail** - Unified `Brain.ask()`, `@tool` decorator, model A/B eval, audit log, abort hotkey shipping working
-- [ ] **Phase 3: PC Control Tools** - Launch apps, window management, media keys, clipboard, screenshot, shell execution with cancellable Popens
+- [x] **Phase 3: PC Control Tools** - Launch apps, window management, media keys, clipboard, screenshot, shell execution with cancellable Popens (completed 2026-04-13)
 - [ ] **Phase 4: Persistent Memory** - SQLite + sqlite-vec cross-session memory; profile facts in system prompt, semantic recall per turn
 - [ ] **Phase 5: Background Process + Crash Plumbing + Graceful Degradation** - pythonw + pystray tray + autostart; stdout/stderr plumbing so crashes are never silent
 - [ ] **Phase 6: Latency Pass + Barge-In + Voice Abort** - Per-stage timing, Piper fast-ack, sentence-streaming TTS, barge-in, "stop"/"cancel" as abort
@@ -87,8 +87,8 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [x] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
+- [x] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
 
 ### Phase 5: Background Process + Crash Plumbing + Graceful Degradation
 **Goal**: Jarvis stops being a terminal program and becomes a tray-icon background process launched via `pythonw.exe` at login. Crash plumbing (stdout/stderr redirect, faulthandler, excepthook + toast, watchdog) lands the same day `jarvis.pyw` ships so silent pythonw crashes never happen. A `Component` protocol unifies subsystem lifecycles, the startup health check runs, and the graceful-degradation matrix lets Jarvis keep running with any single subsystem down.
@@ -102,7 +102,7 @@ Plans:
   5. From the tray menu, user clicks Quit and the process exits cleanly, releasing the mic and closing the DB.
 **Plans**: 3 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
+- [x] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
 - [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
 - [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
 
@@ -193,7 +193,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. Voice Loop Upgrade | 0/5 | Not started | - |
 | 2. Brain Refactor + Tool Framework + Abort Rail | 1/4 | In Progress|  |
-| 3. PC Control Tools | 0/TBD | Not started | - |
+| 3. PC Control Tools | 3/3 | Complete   | 2026-04-13 |
 | 4. Persistent Memory | 0/TBD | Not started | - |
 | 5. Background Process + Crash Plumbing + Graceful Degradation | 0/TBD | Not started | - |
 | 6. Latency Pass + Barge-In + Voice Abort | 0/TBD | Not started | - |
