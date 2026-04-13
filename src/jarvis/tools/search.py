@@ -6,11 +6,29 @@ from jarvis.tools._registry import tool
 # SearXNG URL set by assistant.py at startup
 _searxng_url: str = "http://localhost:8888"
 
+# SAFE-07: Per-turn URL allow-list populated by search_web, checked by fetch_page
+_current_turn_urls: set[str] = set()
+
 
 def set_searxng_url(url: str) -> None:
     """Called once at startup to inject the configured SearXNG URL."""
     global _searxng_url
     _searxng_url = url
+
+
+def clear_turn_urls() -> None:
+    """Clear the per-turn URL allow-list. Called at turn start."""
+    _current_turn_urls.clear()
+
+
+def register_urls(urls: list[str]) -> None:
+    """Add URLs from a search result to the per-turn allow-list."""
+    _current_turn_urls.update(urls)
+
+
+def is_url_allowed(url: str) -> bool:
+    """Check if a URL was returned by search_web this turn."""
+    return url in _current_turn_urls
 
 
 @tool(tier=0)
@@ -31,10 +49,15 @@ def search_web(query: str) -> str:
         results = data.get("results", [])[:5]
         if not results:
             return f"No results found for: {query}"
+        # SAFE-07: Register URLs in per-turn allow-list
+        for r in results:
+            url = r.get("url", "")
+            if url:
+                _current_turn_urls.add(url)
         lines = []
         for i, r in enumerate(results, 1):
             lines.append(f"{i}. {r.get('title', '(no title)')}")
-            lines.append(f"   {r.get('url', '')}")
+            lines.append(f"   URL: {r.get('url', '')}")
             snippet = r.get("content", "")[:200]
             if snippet:
                 lines.append(f"   {snippet}")

@@ -27,3 +27,5 @@ winotify>=1.1.0
 # Phase 7 — file & document tools
 pymupdf4llm>=0.0.17
 send2trash>=1.8.3
+# Phase 8 — web search & page fetch
+trafilatura>=2.0.0
