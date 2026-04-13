@@ -87,7 +87,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 04-01-PLAN.md — Wave 1: pip deps (sqlite-vec, sentence-transformers) + MemoryStore module + Config fields + preload embedder
-- [ ] 04-02-PLAN.md — Wave 2: _build_messages helper + retire self.history + wire _turn_pipeline injection + async fact extraction
+- [x] 04-02-PLAN.md — Wave 2: _build_messages helper + retire self.history + wire _turn_pipeline injection + async fact extraction
 - [ ] 04-03-PLAN.md — Wave 3: memory tools (remember, recall, forget) + set_memory_store injection
 
 ### Phase 5: Background Process + Crash Plumbing + Graceful Degradation

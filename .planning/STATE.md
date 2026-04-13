@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-04-13T01:08:38.857Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-04-13T01:13:38.671Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-10)
 ## Current Position
 
 Phase: 04 (Persistent Memory) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-13
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P03 | 110s | 2 tasks | 3 files |
 | Phase 03 P02 | 127s | 3 tasks | 3 files |
 | Phase 04 P01 | 230s | 2 tasks | 4 files |
+| Phase 04 P02 | 163 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Single manage_window tool with Literal action enum (focus/minimize/close) over 3 separate tools
 - [Phase 03]: set_volume (tier 1, pycaw COM) and media_control (tier 0, ctypes SendInput) as separate tools
 - [Phase 04]: MemoryStore embeds facts as 'key: value' for better semantic matching; superseded_by=-1 is manual-forget sentinel
+- [Phase 04]: Memory wiring: _build_messages scopes recent turns to session_id; async extraction via run_in_executor; CLI ask_ollama also uses DB
 
 ### Pending Todos
 
@@ -97,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T01:08:38.853Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-04-13T01:13:38.667Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
