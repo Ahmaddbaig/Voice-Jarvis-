@@ -88,7 +88,7 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 - [x] **PROC-04**: `faulthandler.enable()` catches C-extension segfaults; a global `sys.excepthook` posts a Windows toast on unhandled exceptions.
 - [x] **PROC-05**: Startup runs health checks for espeak-ng, Ollama + model tag, camera, mic, Outlook COM availability, and `%LOCALAPPDATA%` writability.
 - [x] **PROC-06**: A `Component` protocol unifies lifecycle (`try_init`, `check`, `status`, `last_error`) for every subsystem; try/except lives in exactly three places (component init/check, tool dispatcher, turn-pipeline top).
-- [ ] **PROC-07**: Graceful degradation matrix — when any subsystem fails, the assistant continues with reduced capability rather than crashing.
+- [x] **PROC-07**: Graceful degradation matrix — when any subsystem fails, the assistant continues with reduced capability rather than crashing.
 - [x] **PROC-08**: A watchdog / pystray heartbeat restarts the async worker thread if it dies.
 - [x] **PROC-09**: `install_autostart.ps1` creates a `shell:startup` shortcut to `pythonw.exe src\jarvis.pyw`.
 - [x] **PROC-10**: A second entry point `jarvis_cli.py` preserves the current terminal REPL for development/debugging and shares the same assistant class.
@@ -221,7 +221,7 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | PROC-04 | Phase 5 | Complete |
 | PROC-05 | Phase 5 | Complete |
 | PROC-06 | Phase 5 | Complete |
-| PROC-07 | Phase 5 | Pending |
+| PROC-07 | Phase 5 | Complete |
 | PROC-08 | Phase 5 | Complete |
 | PROC-09 | Phase 5 | Complete |
 | PROC-10 | Phase 2 | Complete |

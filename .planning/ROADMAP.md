@@ -104,7 +104,7 @@ Plans:
 Plans:
 - [x] 05-01-PLAN.md — Wave 1: pip deps (pystray, winotify) + Component protocol + ComponentRegistry + 5 subsystem wrappers + health checks in preload_all
 - [x] 05-02-PLAN.md — Wave 2: jarvis.pyw (crash plumbing + pystray tray + watchdog) + install_autostart.ps1
-- [ ] 05-03-PLAN.md — Wave 3: graceful degradation matrix wired into _turn_pipeline + component status updates + registry passed to assistant
+- [x] 05-03-PLAN.md — Wave 3: graceful degradation matrix wired into _turn_pipeline + component status updates + registry passed to assistant
 
 ### Phase 6: Latency Pass + Barge-In + Voice Abort
 **Goal**: The pipeline is now functionally complete end-to-end, so this phase is a dedicated tuning + UX wave. Every stage (wake -> VAD -> STT -> brain -> TTS) logs timing to SQLite every turn. Piper speaks a sub-400ms "Certainly" fast-ack while Kokoro is still synthesizing the real reply. Kokoro synthesizes sentence-by-sentence with a crossfade so the second sentence starts while the first is still playing. Barge-in works mid-speech. Saying "stop" or "cancel" during a tool call invokes the full abort rail, not just TTS.
