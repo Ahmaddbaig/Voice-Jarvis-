@@ -8,11 +8,58 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any, Callable, Union, get_args, get_origin, get_type_hints, Literal
 
 _logger = logging.getLogger(__name__)
 _REGISTRY: dict[str, ToolDef] = {}
+
+# ---------------------------------------------------------------------------
+# SAFE-04: Per-turn quarantine flag (set by read tools, checked by call_tool)
+# ---------------------------------------------------------------------------
+
+_turn_has_external_content: bool = False
+
+
+def set_turn_has_external_content(value: bool) -> None:
+    """Reset (or set) the quarantine flag — called at the top of _turn_pipeline."""
+    global _turn_has_external_content
+    _turn_has_external_content = value
+
+
+def mark_external_content() -> None:
+    """Called by read tools (read_file, read_pdf, fetch_page, etc.) to flag this turn."""
+    global _turn_has_external_content
+    _turn_has_external_content = True
+
+
+# ---------------------------------------------------------------------------
+# SAFE-03: Tier 2 dry-run preview logger (actions.log, lazy-initialized)
+# ---------------------------------------------------------------------------
+
+_actions_logger: logging.Logger | None = None
+
+
+def _get_actions_logger() -> logging.Logger:
+    """Return (or create) the rotating actions logger at %LOCALAPPDATA%\\Jarvis\\actions.log."""
+    global _actions_logger
+    if _actions_logger is None:
+        log_path = Path(os.environ.get("LOCALAPPDATA", "")) / "Jarvis" / "actions.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        _actions_logger = logging.getLogger("jarvis.actions")
+        _actions_logger.setLevel(logging.INFO)
+        handler = RotatingFileHandler(
+            str(log_path), maxBytes=1_000_000, backupCount=5, encoding="utf-8",
+        )
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        if not any(isinstance(h, RotatingFileHandler) for h in _actions_logger.handlers):
+            _actions_logger.addHandler(handler)
+        _actions_logger.propagate = False
+    return _actions_logger
 
 
 @dataclass
@@ -75,6 +122,16 @@ def call_tool(name: str, arguments: dict) -> str:
     td = _REGISTRY.get(name)
     if td is None:
         return f"[error] Unknown tool: {name}. Available: {', '.join(_REGISTRY.keys())}"
+
+    # SAFE-04: Quarantine — block Tier 2 when external content was ingested this turn
+    if td.tier == 2 and _turn_has_external_content:
+        return "[blocked] Tier 2 tools are blocked after reading external content in this turn. Start a new turn to perform destructive actions."
+
+    # SAFE-03: Dry-run preview for Tier 2 tools
+    if td.tier == 2:
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        args_summary = " ".join(f"{k}={v}" for k, v in arguments.items())
+        _get_actions_logger().info(f"[{ts}] DRY-RUN {name} {args_summary}")
 
     try:
         result = td.fn(**arguments)

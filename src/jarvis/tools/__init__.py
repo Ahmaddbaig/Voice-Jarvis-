@@ -15,6 +15,8 @@ from jarvis.tools._registry import (  # noqa: F401
     all_schemas,
     call_tool,
     get_tier,
+    set_turn_has_external_content,
+    mark_external_content,
 )
 
 _logger = logging.getLogger(__name__)
