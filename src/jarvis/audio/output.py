@@ -41,6 +41,19 @@ from jarvis.core.config import Config
 
 
 # ---------------------------------------------------------------------------
+# Fast-ack phrase pool (D-10, PERF-05)
+# ---------------------------------------------------------------------------
+
+FAST_ACK_PHRASES = [
+    "Certainly, sir.",
+    "Right away, sir.",
+    "One moment, sir.",
+    "Working on it, sir.",
+    "On it, sir.",
+]
+
+
+# ---------------------------------------------------------------------------
 # PiperAck — pre-cached wake acknowledgment ("Sir?")
 # ---------------------------------------------------------------------------
 
@@ -67,6 +80,9 @@ class PiperAck:
         self._cached_ack: Optional[np.ndarray] = None
         self._cached_sr: int = 0
         self._cache_ack(cfg.ack_phrase)
+        # Fast-ack phrase pool (D-10, PERF-05): pre-synthesize at startup
+        self._fast_ack_pool: list[tuple[np.ndarray, int]] = []
+        self._cache_fast_ack_pool()
 
     def _cache_ack(self, text: str) -> None:
         """Synthesize ``text`` once into the in-memory ack cache.
@@ -114,6 +130,24 @@ class PiperAck:
         buf.seek(0)
         data, sr = sf.read(buf, dtype="float32")
         return data, int(sr)
+
+    def _cache_fast_ack_pool(self) -> None:
+        """Pre-synthesize the fast-ack phrase pool at startup (D-10, PERF-05)."""
+        for phrase in FAST_ACK_PHRASES:
+            try:
+                audio, sr = self.synthesize(phrase)
+                self._fast_ack_pool.append((audio, sr))
+            except Exception as exc:  # noqa: BLE001
+                print(
+                    f"[TTS] fast-ack cache failed for {phrase!r}: {exc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
+    @property
+    def fast_ack_pool(self) -> list[tuple[np.ndarray, int]]:
+        """Return the pre-synthesized fast-ack phrase pool."""
+        return self._fast_ack_pool
 
 
 # ---------------------------------------------------------------------------

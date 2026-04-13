@@ -125,6 +125,8 @@ class Config:
     memory_similarity_threshold: float = 0.7
     memory_recent_turns: int = 8
     memory_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # --- Phase 6 NEW: barge-in ---
+    barge_in_threshold: float = 0.90
 
 
 # ---------------------------------------------------------------------------
@@ -204,4 +206,5 @@ def load_config() -> Config:
         hotkey=_env_str("JARVIS_HOTKEY", "<ctrl>+<alt>+j"),
         localappdata_dir=localappdata,
         memory_db_path=localappdata / "memory.db",
+        barge_in_threshold=_env_float("JARVIS_BARGE_IN_THRESHOLD", 0.90),
     )
