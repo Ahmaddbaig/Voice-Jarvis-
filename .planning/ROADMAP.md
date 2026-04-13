@@ -103,7 +103,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 05-01-PLAN.md — Wave 1: pip deps (pystray, winotify) + Component protocol + ComponentRegistry + 5 subsystem wrappers + health checks in preload_all
-- [ ] 05-02-PLAN.md — Wave 2: jarvis.pyw (crash plumbing + pystray tray + watchdog) + install_autostart.ps1
+- [x] 05-02-PLAN.md — Wave 2: jarvis.pyw (crash plumbing + pystray tray + watchdog) + install_autostart.ps1
 - [ ] 05-03-PLAN.md — Wave 3: graceful degradation matrix wired into _turn_pipeline + component status updates + registry passed to assistant
 
 ### Phase 6: Latency Pass + Barge-In + Voice Abort

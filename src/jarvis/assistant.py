@@ -53,6 +53,7 @@ from jarvis.core.config import Config, load_config
 from jarvis.core.preload import preload_all, PreloadedModels
 from jarvis.core.brain import Brain, BrainResponse, ToolCall
 from jarvis.core.abort import PopenRegistry, AbortController
+from jarvis.core.component import ComponentRegistry
 from jarvis.core.audit import AuditLog
 from jarvis.core.memory import MemoryStore
 from jarvis.audio.input import WakeWordStream, VadRecorder, TwoStageGate
@@ -271,6 +272,7 @@ class JarvisAssistant:
         self,
         cfg: Config | None = None,
         preloaded: PreloadedModels | None = None,
+        registry: ComponentRegistry | None = None,
     ) -> None:
         # Allow legacy zero-arg construction for backwards compat — load
         # cfg lazily if not provided. The CLI passes cfg explicitly.
@@ -278,6 +280,7 @@ class JarvisAssistant:
             load_dotenv()
             cfg = load_config()
         self.cfg = cfg
+        self._registry = registry
 
         self.provider = cfg.provider
         if self.provider not in {"openai", "ollama"}:
@@ -513,6 +516,10 @@ class JarvisAssistant:
 
         log_t(f"start  source={source}")
 
+        # Auto-recovery: retry degraded/failed components (PROC-07, D-11)
+        if self._registry:
+            self._registry.try_recover_all()
+
         if source == "wake":
             # Run the two-stage gate. process_wake() returns
             # (text, decision) where decision is one of:
@@ -544,10 +551,33 @@ class JarvisAssistant:
             log_t(f"record samples={len(audio) if audio is not None else 0}")
             if audio is None or len(audio) == 0:
                 return
-            user_text = await loop.run_in_executor(
-                None, self._whisper_transcribe_array, audio
-            )
-            log_t(f"stt    text={(user_text or '')[:40]!r}")
+            try:
+                user_text = await loop.run_in_executor(
+                    None, self._whisper_transcribe_array, audio
+                )
+                log_t(f"stt    text={(user_text or '')[:40]!r}")
+            except Exception as exc:
+                # Degradation: STT unavailable (D-13)
+                log_t(f"stt    FAILED: {exc}")
+                if self._registry:
+                    for c in self._registry:
+                        if c.name == "STT":
+                            c.set_status("failed", str(exc))
+                # Try to speak degradation message before returning
+                try:
+                    if self._fallback_tts:
+                        await loop.run_in_executor(
+                            None, self._fallback_tts.speak,
+                            "Speech recognition is unavailable, sir.",
+                        )
+                    elif self._cloud_tts:
+                        await loop.run_in_executor(
+                            None, self._cloud_tts.speak,
+                            "Speech recognition is unavailable, sir.",
+                        )
+                except Exception:
+                    print("[degraded] STT failed, and TTS also unavailable", flush=True)
+                return
 
         if not user_text or not user_text.strip():
             return
@@ -564,22 +594,40 @@ class JarvisAssistant:
         messages = self._build_messages(user_text)
         # If vision attached, include image in user message
         if self.always_see:
-            image_url = self.vision.latest_image_data_url()
-            if image_url:
-                messages[-1] = {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": user_text},
-                        {"type": "image_url", "image_url": {"url": image_url}},
-                    ],
-                }
+            try:
+                image_url = self.vision.latest_image_data_url()
+                if image_url:
+                    messages[-1] = {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_text},
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                        ],
+                    }
+            except Exception as exc:
+                # Degradation: camera unavailable (D-13) — proceed text-only
+                log_t(f"camera FAILED: {exc}")
+                if self._registry:
+                    for c in self._registry:
+                        if c.name == "Cam":
+                            c.set_status("failed", str(exc))
 
         MAX_TOOL_CALLS = 8
         seen_hashes: set[str] = set()
         reply_text = ""
 
         for iteration in range(MAX_TOOL_CALLS + 1):
-            resp = await loop.run_in_executor(None, self._brain.ask, messages, tools_schema)
+            try:
+                resp = await loop.run_in_executor(None, self._brain.ask, messages, tools_schema)
+            except Exception as exc:
+                # Degradation: brain unavailable (D-13)
+                log_t(f"brain  FAILED: {exc}")
+                if self._registry:
+                    for c in self._registry:
+                        if c.name == "Brain":
+                            c.set_status("failed", str(exc))
+                reply_text = "I'm sorry sir, my brain is unavailable at the moment."
+                break
             log_t(f"brain  iter={iteration} tools={bool(resp.tool_calls)}")
 
             if not resp.tool_calls:
@@ -683,6 +731,14 @@ class JarvisAssistant:
             else:
                 await loop.run_in_executor(None, self._speak_local, reply_text)
             log_t("tts    done")
+        except Exception as exc:
+            # Degradation: TTS unavailable (D-13) — log reply instead of crashing
+            log_t(f"tts    FAILED: {exc}")
+            if self._registry:
+                for c in self._registry:
+                    if c.name == "TTS":
+                        c.set_status("failed", str(exc))
+            print(f"[degraded] TTS failed, reply was: {reply_text}", flush=True)
         finally:
             self.tts_playing.clear()
             # D-01: fire-and-forget async extraction after TTS (D-02: only substantive)
