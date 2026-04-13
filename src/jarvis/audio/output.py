@@ -29,6 +29,7 @@ passes them in. Importing this module stays cheap.
 from __future__ import annotations
 
 import io
+import re
 import sys
 import threading
 import wave
@@ -39,6 +40,69 @@ import sounddevice as sd
 import soundfile as sf
 
 from jarvis.core.config import Config
+
+
+# ---------------------------------------------------------------------------
+# Sentence splitter (D-13, PERF-04)
+# ---------------------------------------------------------------------------
+
+_ABBREV_RE = re.compile(
+    r'\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|approx|incl)\.\s*$'
+)
+
+
+_SENTENCE_SPLIT_RE = re.compile(
+    r'(?<=[.!?])\s+'
+)
+
+
+def _is_real_sentence_boundary(text_before: str) -> bool:
+    """Return True unless *text_before* ends with a known abbreviation.
+
+    Decimals (e.g. "3.14") don't need special handling here because the split
+    regex requires whitespace after the punctuation -- "3.14" mid-number has no
+    trailing whitespace so won't trigger a split. "3.14. Next" IS a real
+    sentence boundary (the period ends the sentence, not the decimal).
+    """
+    if _ABBREV_RE.search(text_before):
+        return False
+    return True
+
+
+def split_sentences(text: str) -> list[str]:
+    """Split text into sentences, respecting abbreviations and decimals."""
+    text = text.strip()
+    if not text:
+        return []
+    # Split on sentence-ending punctuation followed by whitespace, then
+    # re-merge splits that were actually abbreviations or decimals.
+    raw_parts = _SENTENCE_SPLIT_RE.split(text)
+    merged: list[str] = []
+    for part in raw_parts:
+        if merged and not _is_real_sentence_boundary(merged[-1]):
+            # Previous "split" was a false positive — re-join
+            merged[-1] = merged[-1] + " " + part
+        else:
+            merged.append(part)
+    return [p.strip() for p in merged if p.strip()]
+
+
+# ---------------------------------------------------------------------------
+# Crossfade utility (D-14, PERF-04)
+# ---------------------------------------------------------------------------
+
+
+def crossfade(a: np.ndarray, b: np.ndarray, overlap_samples: int) -> np.ndarray:
+    """Linear crossfade between two 1D float32 audio arrays.
+
+    30ms default at 24kHz = 720 samples. Output length = len(a) + len(b) - overlap_samples.
+    """
+    if overlap_samples <= 0 or len(a) < overlap_samples or len(b) < overlap_samples:
+        return np.concatenate([a, b])
+    fade_out = np.linspace(1.0, 0.0, overlap_samples, dtype=np.float32)
+    fade_in = np.linspace(0.0, 1.0, overlap_samples, dtype=np.float32)
+    overlap = a[-overlap_samples:] * fade_out + b[:overlap_samples] * fade_in
+    return np.concatenate([a[:-overlap_samples], overlap, b[overlap_samples:]])
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +346,141 @@ class FallbackTTS:
         # keep running so the user can still issue commands and read text
         # replies in the terminal.
         self._log_degradation("all", RuntimeError("all TTS backends failed"))
+
+    def speak_streaming(
+        self,
+        text: str,
+        cancel: threading.Event | None = None,
+        crossfade_ms: int = 30,
+    ) -> None:
+        """Sentence-by-sentence Kokoro synthesis with crossfade (PERF-04).
+
+        Only uses Kokoro. If Kokoro is broken or unavailable, falls back to
+        :meth:`speak` which handles the Piper/SAPI chain. CloudTTS and Piper
+        don't use this -- CloudTTS streams natively, Piper is short enough
+        that streaming isn't needed (D-15).
+
+        For single-sentence replies, delegates to :meth:`speak` (no streaming
+        benefit). For multi-sentence replies, synthesizes each sentence with
+        ``split_pattern=None`` and plays with a linear crossfade at boundaries.
+        """
+        if not text or not text.strip():
+            return
+        if self._kokoro is None or self._kokoro_broken:
+            self.speak(text, cancel)
+            return
+
+        _cancel = cancel or threading.Event()
+        sentences = split_sentences(text)
+        if len(sentences) <= 1:
+            self.speak(text, cancel)
+            return
+
+        sr = 24_000
+        overlap_samples = int(sr * crossfade_ms / 1000)  # 30ms = 720 samples
+        chunk_samples = int(sr * 50 / 1000)  # 50ms = 1200 samples
+
+        stream = sd.OutputStream(samplerate=sr, channels=1, dtype="float32")
+        stream.start()
+        try:
+            prev_tail: np.ndarray | None = None  # last overlap_samples of prev sentence
+
+            for sentence in sentences:
+                if _cancel.is_set():
+                    stream.abort()
+                    return
+
+                # Synthesize one sentence with split_pattern=None (D-13, Pitfall 6).
+                # KPipeline may yield multiple chunks per sentence if it exceeds
+                # 510 phonemes internally, so concatenate all chunks first.
+                sentence_chunks: list[np.ndarray] = []
+                try:
+                    for _gs, _ps, audio in self._kokoro(
+                        sentence,
+                        voice=self._cfg.tts_voice,
+                        speed=1.0,
+                        split_pattern=None,
+                    ):
+                        if _cancel.is_set():
+                            stream.abort()
+                            return
+                        sentence_chunks.append(audio)
+                except Exception as exc:
+                    self._kokoro_broken = True
+                    self._log_degradation("kokoro_streaming", exc)
+                    stream.abort()
+                    remaining = " ".join(sentences[sentences.index(sentence):])
+                    self.speak(remaining, cancel)
+                    return
+
+                if not sentence_chunks:
+                    continue
+
+                sentence_audio = (
+                    np.concatenate(sentence_chunks)
+                    if len(sentence_chunks) > 1
+                    else sentence_chunks[0]
+                )
+
+                # --- Crossfade logic (Research Pattern 3) ---
+                # For each sentence:
+                #   1. Crossfade prev_tail with sentence start (if prev_tail exists)
+                #   2. Play everything except the last overlap_samples
+                #   3. Save the last overlap_samples as prev_tail for next iteration
+
+                if prev_tail is not None and len(sentence_audio) >= overlap_samples:
+                    # Crossfade prev_tail with start of this sentence
+                    xfaded = crossfade(prev_tail, sentence_audio[:overlap_samples], overlap_samples)
+                    # Play: crossfaded region + middle (up to last overlap_samples)
+                    if len(sentence_audio) > overlap_samples * 2:
+                        play_audio = np.concatenate([
+                            xfaded,
+                            sentence_audio[overlap_samples:-overlap_samples],
+                        ])
+                    else:
+                        # Sentence shorter than 2x overlap -- just play crossfade
+                        play_audio = xfaded
+                    # Save new tail
+                    prev_tail = sentence_audio[-overlap_samples:].copy()
+                elif prev_tail is not None:
+                    # Sentence too short for crossfade -- concatenate directly
+                    play_audio = np.concatenate([prev_tail, sentence_audio])
+                    prev_tail = None
+                else:
+                    # First sentence: play everything except last overlap_samples
+                    if len(sentence_audio) > overlap_samples:
+                        play_audio = sentence_audio[:-overlap_samples]
+                        prev_tail = sentence_audio[-overlap_samples:].copy()
+                    else:
+                        play_audio = sentence_audio
+                        prev_tail = None
+
+                # Write in small chunks, checking cancel between each (Pitfall 1)
+                offset = 0
+                while offset < len(play_audio):
+                    if _cancel.is_set():
+                        stream.abort()
+                        return
+                    end = min(offset + chunk_samples, len(play_audio))
+                    stream.write(play_audio[offset:end].reshape(-1, 1))
+                    offset = end
+
+            # Play any remaining tail after the last sentence
+            if prev_tail is not None:
+                stream.write(prev_tail.reshape(-1, 1))
+
+            stream.stop()  # drain remaining buffers
+        except Exception as exc:
+            self._log_degradation("kokoro_streaming", exc)
+            try:
+                stream.abort()
+            except Exception:
+                pass
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                pass
 
     def _log_degradation(self, backend: str, exc: BaseException) -> None:
         """Log a backend failure to stderr.
