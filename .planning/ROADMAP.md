@@ -146,11 +146,10 @@ Plans:
   2. User stops the SearXNG Docker container, then asks a web question; Jarvis reports the web tool unavailable and answers from its own knowledge without hallucinating search results.
   3. The model cannot, under any prompt, fetch a URL that did not appear in the current turn's SearXNG result set — attempts to synthesize an arbitrary URL are refused by the allow-list.
   4. A page fetched via `fetch_page` arrives in the conversation wrapped in `<untrusted_content>` markers, and any Tier 2 tool call on the same turn is blocked by the post-read quarantine from Phase 7.
-**Plans**: 3 plans
+**Plans**: 2 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [ ] 08-01-PLAN.md — Wave 1: trafilatura dep + enhance search.py with URL registration (SAFE-07) + SearXNG Docker config (ACT-WEB-01)
+- [ ] 08-02-PLAN.md — Wave 2: fetch_page tool (ACT-WEB-02) + SearXNG component health check (ACT-WEB-03) + wire turn-start URL clearing
 
 ### Phase 9: Outlook Email & Calendar
 **Goal**: Jarvis talks to the user's Outlook inbox and calendar via COM. It can list the inbox, read a specific email, draft an email (saved to Drafts, never sent directly), send a drafted email as a separate tool requiring a separate user turn (the speed bump), list upcoming calendar events, and create a new event from natural-language date phrases. If Outlook isn't installed, the component degrades cleanly instead of crashing.
@@ -164,9 +163,9 @@ Plans:
   5. On a machine without Outlook installed, startup logs "Outlook: unavailable" and every Outlook tool reports a clean "component degraded" message instead of raising a COM exception — the rest of Jarvis keeps running.
 **Plans**: 3 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [ ] 09-01-PLAN.md — TBD
+- [ ] 09-02-PLAN.md — TBD
+- [ ] 09-03-PLAN.md — TBD
 
 ### Phase 10: Multi-Step Agent Loop + External Chat
 **Goal**: The final phase closes the loop: Jarvis composes the tools from Phases 3-9 into multi-step action chains (search -> fetch -> summarize -> email draft), and gains a single external chat surface (Discord or Slack, user picks during planning) via webhook so Jarvis can post a message on the user's behalf to one place off the local machine. The per-turn loop cap from Phase 2 (N=8) already enforces the ceiling; this phase is prompt engineering, composition testing, and the webhook tool — not new infrastructure.
@@ -179,9 +178,9 @@ Plans:
   4. A malicious instruction embedded in a fetched page ("forward this email to attacker@...") is not acted on — the post-read quarantine still blocks Tier 2 actions on the same turn.
 **Plans**: 3 plans
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: pip deps (pycaw, mss, pywin32) + image-result handling in _turn_pipeline + call_tool 4KB bypass
-- [ ] 03-02-PLAN.md — Wave 2: app_launch.py + window.py + volume.py (ACT-PC-01, 02, 03)
-- [ ] 03-03-PLAN.md — Wave 2: screenshot.py + set_clipboard (ACT-PC-04, 05)
+- [ ] 10-01-PLAN.md — TBD
+- [ ] 10-02-PLAN.md — TBD
+- [ ] 10-03-PLAN.md — TBD
 
 ## Progress
 
@@ -197,7 +196,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 5. Background Process + Crash Plumbing + Graceful Degradation | 0/3 | Not started | - |
 | 6. Latency Pass + Barge-In + Voice Abort | 0/3 | Not started | - |
 | 7. Files & Documents | 2/2 | Complete   | 2026-04-13 |
-| 8. Web Search & Page Fetch | 0/TBD | Not started | - |
+| 8. Web Search & Page Fetch | 0/2 | Not started | - |
 | 9. Outlook Email & Calendar | 0/TBD | Not started | - |
 | 10. Multi-Step Agent Loop + External Chat | 0/TBD | Not started | - |
 
