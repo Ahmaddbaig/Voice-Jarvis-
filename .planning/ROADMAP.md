@@ -120,7 +120,7 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md — Wave 1: OutputStream migration for FallbackTTS + cancel event + TimingLog SQLite + fast-ack phrase pool + config fields (PERF-01, PERF-05)
 - [x] 06-02-PLAN.md — Wave 2: Barge-in self-trigger discrimination + voice abort keywords + fast-ack concurrent with brain (VOICE-07, PERF-03, PERF-06)
-- [ ] 06-03-PLAN.md — Wave 3: Kokoro sentence streaming + crossfade + latency target verification (PERF-02, PERF-04)
+- [x] 06-03-PLAN.md — Wave 3: Kokoro sentence streaming + crossfade + latency target verification (PERF-02, PERF-04)
 
 ### Phase 7: Files & Documents
 **Goal**: Jarvis can read, summarize, search, write, and delete files within allow-listed directories. PDFs become first-class via pymupdf4llm. This is the first phase that introduces Tier 2 (destructive) tools, so the dry-run preview rail and the post-read quarantine (SAFE-03, SAFE-04) land here — Tier 2 tools are blocked on any turn that already pulled in external content, and every Tier 2 call writes a dry-run preview before acting.
