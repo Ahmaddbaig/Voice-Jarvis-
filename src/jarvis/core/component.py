@@ -243,3 +243,27 @@ class CameraComponent(_ComponentBase):
             return self._succeed()
         except Exception as exc:
             return self._fail(exc)
+
+
+class SearXNGComponent(_ComponentBase):
+    """Pings SearXNG at startup. Yellow if unreachable, green if reachable."""
+
+    def __init__(self, url: str = "http://localhost:8888") -> None:
+        super().__init__("Web")
+        self._url = url
+
+    def try_init(self) -> bool:
+        try:
+            import requests as http_requests
+            resp = http_requests.get(
+                f"{self._url}/search",
+                params={"q": "test", "format": "json"},
+                timeout=3,
+            )
+            resp.raise_for_status()
+            return self._succeed()
+        except Exception as exc:
+            # Degraded, not failed -- SearXNG is optional (D-13)
+            self._status = "degraded"
+            self._error = str(exc)
+            return False

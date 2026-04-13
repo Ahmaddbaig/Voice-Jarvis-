@@ -63,7 +63,7 @@ from jarvis.audio.output import PiperAck, FallbackTTS, CloudTTS
 from jarvis.audio.wake_log import WakeLog
 from jarvis.tools import all_schemas, call_tool, get_tier, discover_tools, set_turn_has_external_content, mark_external_content
 from jarvis.tools.shell import set_popen_registry
-from jarvis.tools.search import set_searxng_url
+from jarvis.tools.search import set_searxng_url, clear_turn_urls
 from jarvis.tools.memory_tools import set_memory_store
 
 
@@ -552,6 +552,7 @@ class JarvisAssistant:
 
         # SAFE-04: Reset quarantine flag at the start of each turn (D-11)
         set_turn_has_external_content(False)
+        clear_turn_urls()  # SAFE-07: Reset per-turn URL allow-list
 
         # Auto-recovery: retry degraded/failed components (PROC-07, D-11)
         if self._registry:
