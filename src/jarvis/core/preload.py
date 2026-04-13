@@ -113,6 +113,7 @@ class PreloadedModels:
     whisper: object
     kokoro: object
     piper_voice: object
+    embedder: object
 
 
 # ---------------------------------------------------------------------------
@@ -137,12 +138,12 @@ def preload_all(cfg: Config) -> PreloadedModels:
     started = time.perf_counter()
     print("Loading voice-loop models...", flush=True)
 
-    # [1/6] espeak-ng probe — MUST be first, BEFORE KPipeline construction
-    print("  [1/6] Checking espeak-ng...", flush=True)
+    # [1/8] espeak-ng probe — MUST be first, BEFORE KPipeline construction
+    print("  [1/8] Checking espeak-ng...", flush=True)
     verify_espeak_ng_or_exit()
 
-    # [2/6] openWakeWord
-    print("  [2/6] openWakeWord...", flush=True)
+    # [2/8] openWakeWord
+    print("  [2/8] openWakeWord...", flush=True)
     if not cfg.wake_model_path.exists():
         try:
             import openwakeword.utils
@@ -163,16 +164,16 @@ def preload_all(cfg: Config) -> PreloadedModels:
     keys = list(oww.prediction_buffer.keys())
     print(f"    ready. Model keys: {keys}", flush=True)
 
-    # [3/6] silero-vad (ONNX path — keeps the perf-critical path off torch)
-    print("  [3/6] silero-vad (ONNX)...", flush=True)
+    # [3/8] silero-vad (ONNX path — keeps the perf-critical path off torch)
+    print("  [3/8] silero-vad (ONNX)...", flush=True)
     from silero_vad import load_silero_vad
 
     vad_model = load_silero_vad(onnx=True)
     # No VADIterator here — Plan 03 constructs it (the iterator is stateful
     # per recording and belongs to the audio_in module).
 
-    # [4/6] faster-whisper
-    print("  [4/6] faster-whisper...", flush=True)
+    # [4/8] faster-whisper
+    print("  [4/8] faster-whisper...", flush=True)
     from faster_whisper import WhisperModel
 
     whisper = WhisperModel(
@@ -184,8 +185,8 @@ def preload_all(cfg: Config) -> PreloadedModels:
     _seg, _info = whisper.transcribe(np.zeros(16_000, dtype=np.float32))
     list(_seg)
 
-    # [5/6] Kokoro — first run downloads ~350 MB from HuggingFace
-    print("  [5/6] Kokoro (first run downloads ~350 MB)...", flush=True)
+    # [5/8] Kokoro — first run downloads ~350 MB from HuggingFace
+    print("  [5/8] Kokoro (first run downloads ~350 MB)...", flush=True)
     from kokoro import KPipeline
 
     kokoro_pipe = KPipeline(lang_code=cfg.kokoro_lang_code)
@@ -193,8 +194,8 @@ def preload_all(cfg: Config) -> PreloadedModels:
     for _ in kokoro_pipe("ready", voice=cfg.tts_voice):
         pass
 
-    # [6/6] Piper ack voice
-    print("  [6/6] Piper ack voice...", flush=True)
+    # [6/8] Piper ack voice
+    print("  [6/8] Piper ack voice...", flush=True)
     piper_onnx = cfg.piper_voice_dir / f"{cfg.piper_voice_name}.onnx"
     piper_cfg = cfg.piper_voice_dir / f"{cfg.piper_voice_name}.onnx.json"
     if not piper_onnx.exists():
@@ -214,12 +215,21 @@ def preload_all(cfg: Config) -> PreloadedModels:
         config_path=str(piper_cfg),
     )
 
-    # [7/7] Warm up Ollama — make gemma resident in RAM with num_ctx pinned
+    # [7/8] sentence-transformers (Phase 4 — persistent memory)
+    print("  [7/8] sentence-transformers...", flush=True)
+    from sentence_transformers import SentenceTransformer
+
+    embedder = SentenceTransformer(cfg.memory_embedding_model)
+    # Warmup with a short encode
+    embedder.encode("warmup", convert_to_numpy=True)
+    print("    ready.", flush=True)
+
+    # [8/8] Warm up Ollama — make gemma resident in RAM with num_ctx pinned
     # so the FIRST real turn doesn't pay the cold-load tax (5-10s on 8B Q4).
     # Best-effort: if Ollama is down, log and continue — Phase 1 startup has
     # already verified Ollama in the preloader's upstream callers.
     if cfg.provider == "ollama":
-        print("  [7/7] Warming up Ollama...", flush=True)
+        print("  [8/8] Warming up Ollama...", flush=True)
         try:
             import requests as _requests
 
@@ -254,4 +264,5 @@ def preload_all(cfg: Config) -> PreloadedModels:
         whisper=whisper,
         kokoro=kokoro_pipe,
         piper_voice=piper_voice,
+        embedder=embedder,
     )

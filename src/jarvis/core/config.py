@@ -116,6 +116,15 @@ class Config:
     hotkey: str = "<ctrl>+<alt>+j"
     # --- Phase 1 NEW: runtime data dir ---
     localappdata_dir: Path = field(default_factory=lambda: Path())
+    # --- Phase 4 NEW: persistent memory ---
+    memory_db_path: Path = field(default_factory=lambda: Path())
+    memory_top_k: int = 5
+    memory_profile_max_tokens: int = 500
+    memory_recall_max_tokens: int = 1500
+    memory_total_max_tokens: int = 2000
+    memory_similarity_threshold: float = 0.7
+    memory_recent_turns: int = 8
+    memory_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 # ---------------------------------------------------------------------------
@@ -194,4 +203,5 @@ def load_config() -> Config:
         input_device=(_env_str("JARVIS_INPUT_DEVICE", "") or None),
         hotkey=_env_str("JARVIS_HOTKEY", "<ctrl>+<alt>+j"),
         localappdata_dir=localappdata,
+        memory_db_path=localappdata / "memory.db",
     )

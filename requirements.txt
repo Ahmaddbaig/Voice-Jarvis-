@@ -18,3 +18,6 @@ pycaw>=20230407
 mss>=10.0.0
 pywin32>=306
 Pillow>=10.0.0
+# Phase 4 — persistent memory
+sqlite-vec>=0.1.9
+sentence-transformers>=5.0.0
