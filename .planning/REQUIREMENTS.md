@@ -76,7 +76,7 @@ Requirements for reaching daily-driver status. Each maps to a roadmap phase.
 - [x] **MEMORY-05**: Retrieved items include similarity scores; anything below 0.7 is tagged "uncertain" in the prompt so the model hedges.
 - [x] **MEMORY-06**: Facts are typed (`profile`, `preference`, `state`, `event`, `identity`) with per-type expiry (e.g. `state` facts expire after 90 days).
 - [x] **MEMORY-07**: Supersession detection — a new contradicting fact marks the old one `superseded_by`, so stale preferences don't linger.
-- [ ] **MEMORY-08**: `remember`, `recall`, and `forget` are exposed as tools so Jarvis can explicitly persist and redact facts on request.
+- [x] **MEMORY-08**: `remember`, `recall`, and `forget` are exposed as tools so Jarvis can explicitly persist and redact facts on request.
 - [x] **MEMORY-09**: PII (emails, phone numbers, credit cards) is redacted by regex *before* content is embedded.
 - [x] **MEMORY-10**: In-process `self.history` rolling window is retired; SQLite is the single source of conversation truth.
 
@@ -212,7 +212,7 @@ Every v1 requirement is mapped to exactly one phase. Phases defined in `.plannin
 | MEMORY-05 | Phase 4 | Complete |
 | MEMORY-06 | Phase 4 | Complete |
 | MEMORY-07 | Phase 4 | Complete |
-| MEMORY-08 | Phase 4 | Pending |
+| MEMORY-08 | Phase 4 | Complete |
 | MEMORY-09 | Phase 4 | Complete |
 | MEMORY-10 | Phase 4 | Complete |
 | PROC-01 | Phase 5 | Pending |

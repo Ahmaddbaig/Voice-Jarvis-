@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Voice Loop Upgrade** - Wake word, VAD-bounded recording, Kokoro TTS, async refactor — hands-free chatbot with a pleasant voice
 - [ ] **Phase 2: Brain Refactor + Tool Framework + Abort Rail** - Unified `Brain.ask()`, `@tool` decorator, model A/B eval, audit log, abort hotkey shipping working
 - [x] **Phase 3: PC Control Tools** - Launch apps, window management, media keys, clipboard, screenshot, shell execution with cancellable Popens (completed 2026-04-13)
-- [ ] **Phase 4: Persistent Memory** - SQLite + sqlite-vec cross-session memory; profile facts in system prompt, semantic recall per turn
+- [x] **Phase 4: Persistent Memory** - SQLite + sqlite-vec cross-session memory; profile facts in system prompt, semantic recall per turn (completed 2026-04-13)
 - [ ] **Phase 5: Background Process + Crash Plumbing + Graceful Degradation** - pythonw + pystray tray + autostart; stdout/stderr plumbing so crashes are never silent
 - [ ] **Phase 6: Latency Pass + Barge-In + Voice Abort** - Per-stage timing, Piper fast-ack, sentence-streaming TTS, barge-in, "stop"/"cancel" as abort
 - [ ] **Phase 7: Files & Documents** - Read/write/search files and PDFs with path allow-list, send2trash deletes, Tier 2 guards
@@ -88,7 +88,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Wave 1: pip deps (sqlite-vec, sentence-transformers) + MemoryStore module + Config fields + preload embedder
 - [x] 04-02-PLAN.md — Wave 2: _build_messages helper + retire self.history + wire _turn_pipeline injection + async fact extraction
-- [ ] 04-03-PLAN.md — Wave 3: memory tools (remember, recall, forget) + set_memory_store injection
+- [x] 04-03-PLAN.md — Wave 3: memory tools (remember, recall, forget) + set_memory_store injection
 
 ### Phase 5: Background Process + Crash Plumbing + Graceful Degradation
 **Goal**: Jarvis stops being a terminal program and becomes a tray-icon background process launched via `pythonw.exe` at login. Crash plumbing (stdout/stderr redirect, faulthandler, excepthook + toast, watchdog) lands the same day `jarvis.pyw` ships so silent pythonw crashes never happen. A `Component` protocol unifies subsystem lifecycles, the startup health check runs, and the graceful-degradation matrix lets Jarvis keep running with any single subsystem down.
@@ -194,7 +194,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 1. Voice Loop Upgrade | 0/5 | Not started | - |
 | 2. Brain Refactor + Tool Framework + Abort Rail | 1/4 | In Progress|  |
 | 3. PC Control Tools | 3/3 | Complete   | 2026-04-13 |
-| 4. Persistent Memory | 0/3 | Not started | - |
+| 4. Persistent Memory | 3/3 | Complete   | 2026-04-13 |
 | 5. Background Process + Crash Plumbing + Graceful Degradation | 0/TBD | Not started | - |
 | 6. Latency Pass + Barge-In + Voice Abort | 0/TBD | Not started | - |
 | 7. Files & Documents | 0/TBD | Not started | - |
