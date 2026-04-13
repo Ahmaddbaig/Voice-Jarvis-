@@ -25,6 +25,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from jarvis.core.config import Config
+from jarvis.core.component import (
+    ComponentRegistry,
+    WakeComponent,
+    STTComponent,
+    BrainComponent,
+    TTSComponent,
+    CameraComponent,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -121,8 +129,11 @@ class PreloadedModels:
 # ---------------------------------------------------------------------------
 
 
-def preload_all(cfg: Config) -> PreloadedModels:
-    """Construct and warm every voice-loop model.
+def preload_all(cfg: Config) -> tuple[PreloadedModels, ComponentRegistry]:
+    """Construct and warm every voice-loop model, then run health checks.
+
+    Returns a ``(PreloadedModels, ComponentRegistry)`` tuple. The registry
+    contains 5 component wrappers with startup health-check results.
 
     Order is load-bearing: the espeak-ng probe MUST run before
     :class:`kokoro.KPipeline` is constructed (VOICE-06). All other heavy
@@ -138,12 +149,12 @@ def preload_all(cfg: Config) -> PreloadedModels:
     started = time.perf_counter()
     print("Loading voice-loop models...", flush=True)
 
-    # [1/8] espeak-ng probe — MUST be first, BEFORE KPipeline construction
-    print("  [1/8] Checking espeak-ng...", flush=True)
+    # [1/9] espeak-ng probe — MUST be first, BEFORE KPipeline construction
+    print("  [1/9] Checking espeak-ng...", flush=True)
     verify_espeak_ng_or_exit()
 
-    # [2/8] openWakeWord
-    print("  [2/8] openWakeWord...", flush=True)
+    # [2/9] openWakeWord
+    print("  [2/9] openWakeWord...", flush=True)
     if not cfg.wake_model_path.exists():
         try:
             import openwakeword.utils
@@ -164,16 +175,16 @@ def preload_all(cfg: Config) -> PreloadedModels:
     keys = list(oww.prediction_buffer.keys())
     print(f"    ready. Model keys: {keys}", flush=True)
 
-    # [3/8] silero-vad (ONNX path — keeps the perf-critical path off torch)
-    print("  [3/8] silero-vad (ONNX)...", flush=True)
+    # [3/9] silero-vad (ONNX path — keeps the perf-critical path off torch)
+    print("  [3/9] silero-vad (ONNX)...", flush=True)
     from silero_vad import load_silero_vad
 
     vad_model = load_silero_vad(onnx=True)
     # No VADIterator here — Plan 03 constructs it (the iterator is stateful
     # per recording and belongs to the audio_in module).
 
-    # [4/8] faster-whisper
-    print("  [4/8] faster-whisper...", flush=True)
+    # [4/9] faster-whisper
+    print("  [4/9] faster-whisper...", flush=True)
     from faster_whisper import WhisperModel
 
     whisper = WhisperModel(
@@ -185,8 +196,8 @@ def preload_all(cfg: Config) -> PreloadedModels:
     _seg, _info = whisper.transcribe(np.zeros(16_000, dtype=np.float32))
     list(_seg)
 
-    # [5/8] Kokoro — first run downloads ~350 MB from HuggingFace
-    print("  [5/8] Kokoro (first run downloads ~350 MB)...", flush=True)
+    # [5/9] Kokoro — first run downloads ~350 MB from HuggingFace
+    print("  [5/9] Kokoro (first run downloads ~350 MB)...", flush=True)
     from kokoro import KPipeline
 
     kokoro_pipe = KPipeline(lang_code=cfg.kokoro_lang_code)
@@ -194,8 +205,8 @@ def preload_all(cfg: Config) -> PreloadedModels:
     for _ in kokoro_pipe("ready", voice=cfg.tts_voice):
         pass
 
-    # [6/8] Piper ack voice
-    print("  [6/8] Piper ack voice...", flush=True)
+    # [6/9] Piper ack voice
+    print("  [6/9] Piper ack voice...", flush=True)
     piper_onnx = cfg.piper_voice_dir / f"{cfg.piper_voice_name}.onnx"
     piper_cfg = cfg.piper_voice_dir / f"{cfg.piper_voice_name}.onnx.json"
     if not piper_onnx.exists():
@@ -215,8 +226,8 @@ def preload_all(cfg: Config) -> PreloadedModels:
         config_path=str(piper_cfg),
     )
 
-    # [7/8] sentence-transformers (Phase 4 — persistent memory)
-    print("  [7/8] sentence-transformers...", flush=True)
+    # [7/9] sentence-transformers (Phase 4 — persistent memory)
+    print("  [7/9] sentence-transformers...", flush=True)
     from sentence_transformers import SentenceTransformer
 
     embedder = SentenceTransformer(cfg.memory_embedding_model)
@@ -224,12 +235,12 @@ def preload_all(cfg: Config) -> PreloadedModels:
     embedder.encode("warmup", convert_to_numpy=True)
     print("    ready.", flush=True)
 
-    # [8/8] Warm up Ollama — make gemma resident in RAM with num_ctx pinned
+    # [8/9] Warm up Ollama — make gemma resident in RAM with num_ctx pinned
     # so the FIRST real turn doesn't pay the cold-load tax (5-10s on 8B Q4).
     # Best-effort: if Ollama is down, log and continue — Phase 1 startup has
     # already verified Ollama in the preloader's upstream callers.
     if cfg.provider == "ollama":
-        print("  [8/8] Warming up Ollama...", flush=True)
+        print("  [8/9] Warming up Ollama...", flush=True)
         try:
             import requests as _requests
 
@@ -255,14 +266,27 @@ def preload_all(cfg: Config) -> PreloadedModels:
                 flush=True,
             )
 
+    # [9/9] Component health checks (PROC-05, PROC-06)
+    print("  [9/9] Running health checks...", flush=True)
+    registry = ComponentRegistry()
+    registry.register(WakeComponent())
+    registry.register(STTComponent(whisper))
+    registry.register(BrainComponent(cfg.provider, cfg.ollama_url, cfg.ollama_model))
+    registry.register(TTSComponent(kokoro_pipe, piper_voice))
+    registry.register(CameraComponent(cfg.camera_index))
+    registry.run_startup_checks()
+
     elapsed = time.perf_counter() - started
     print(f"All models loaded in {elapsed:.1f}s.", flush=True)
 
-    return PreloadedModels(
-        oww=oww,
-        vad_model=vad_model,
-        whisper=whisper,
-        kokoro=kokoro_pipe,
-        piper_voice=piper_voice,
-        embedder=embedder,
+    return (
+        PreloadedModels(
+            oww=oww,
+            vad_model=vad_model,
+            whisper=whisper,
+            kokoro=kokoro_pipe,
+            piper_voice=piper_voice,
+            embedder=embedder,
+        ),
+        registry,
     )

@@ -34,7 +34,7 @@ def main() -> None:
 
     # Wave 1 preload — runs verify_espeak_ng_or_exit then constructs every
     # heavy model. First run downloads ~350 MB Kokoro weights from HF.
-    models = preload_all(cfg)
+    models, _registry = preload_all(cfg)
 
     # Construct the assistant in voice-first mode and start the loop.
     assistant = JarvisAssistant(cfg, preloaded=models)
