@@ -54,6 +54,7 @@ from jarvis.core.preload import preload_all, PreloadedModels
 from jarvis.core.brain import Brain, BrainResponse, ToolCall
 from jarvis.core.abort import PopenRegistry, AbortController
 from jarvis.core.audit import AuditLog
+from jarvis.core.memory import MemoryStore
 from jarvis.audio.input import WakeWordStream, VadRecorder, TwoStageGate
 from jarvis.audio.output import PiperAck, FallbackTTS, CloudTTS
 from jarvis.audio.wake_log import WakeLog
@@ -86,6 +87,29 @@ specific real voice.
 When describing what the camera sees, describe only what is visible and
 say when you are uncertain.
 """.strip()
+
+
+EXTRACTION_SYSTEM_PROMPT = """You extract facts about the user from conversations.
+
+Analyze the exchange below and return a JSON array of facts learned about the user.
+Each fact is an object with these fields:
+- "type": one of "identity", "preference", "profile", "state", "event"
+- "key": a short identifier (e.g. "name", "reply_style", "current_project")
+- "value": the fact value as a concise string
+
+If no new facts are present, return an empty array: []
+
+If a new fact contradicts a previously known fact, include a "supersedes_key" field
+with the key of the old fact.
+
+Return ONLY valid JSON. No markdown, no explanation.
+
+Type definitions:
+- identity: name, age, pronouns -- things that rarely change
+- preference: communication style, units, language -- user preferences
+- profile: job, location, interests, family -- biographical info
+- state: current project, mood, what they're working on -- changes often
+- event: meetings, trips, appointments -- time-bound occurrences"""
 
 
 def _extract_base64_from_data_url(image_data_url: str) -> str:
@@ -284,7 +308,7 @@ class JarvisAssistant:
         self.camera_fps = cfg.camera_fps
         self.vision = ContinuousVision(self.camera_index, self.camera_fps)
         self.previous_response_id: str | None = None
-        self.history: list[dict[str, object]] = []
+        # self.history retired (D-12) — SQLite turns table is the single source of truth
         self.local_tts = pyttsx3.init()
         self._configure_local_tts()
 
@@ -316,6 +340,19 @@ class JarvisAssistant:
         db_path = cfg.localappdata_dir / "jarvis.db"
         self._audit_log = AuditLog(db_path)
         self._brain = Brain(cfg, self.client)
+
+        # Phase 4: persistent memory
+        self._session_id = str(uuid.uuid4())
+        if preloaded is not None and hasattr(preloaded, 'embedder') and preloaded.embedder is not None:
+            self._memory = MemoryStore(cfg.memory_db_path, preloaded.embedder)
+        else:
+            # CLI mode or no embedder — try to create MemoryStore with lazy load
+            try:
+                from sentence_transformers import SentenceTransformer
+                _embedder = SentenceTransformer(cfg.memory_embedding_model)
+                self._memory = MemoryStore(cfg.memory_db_path, _embedder)
+            except Exception:
+                self._memory = None
 
         # Inject shared instances into tools that need them
         set_popen_registry(self._popen_registry)
@@ -514,13 +551,14 @@ class JarvisAssistant:
 
         print(f"[user] {user_text}", flush=True)
 
+        # Store user turn in memory DB
+        if self._memory:
+            self._memory.store_turn("user", user_text, self._session_id)
+
         # ----- Brain + Tool-Call Loop (BRAIN-06: cap N=8, duplicate detection) -----
         turn_id = str(uuid.uuid4())
         tools_schema = all_schemas() if discover_tools() else None
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_text},
-        ]
+        messages = self._build_messages(user_text)
         # If vision attached, include image in user message
         if self.always_see:
             image_url = self.vision.latest_image_data_url()
@@ -628,6 +666,10 @@ class JarvisAssistant:
         log_t(f"brain  words={len(reply_text.split())}")
         print(f"[jarvis] {reply_text}", flush=True)
 
+        # Store assistant turn in memory DB
+        if self._memory and reply_text and reply_text != "(no response)":
+            self._memory.store_turn("assistant", reply_text, self._session_id)
+
         # Speak — D-04: routing pushed into speak layer
         self.tts_playing.set()
         try:
@@ -640,6 +682,123 @@ class JarvisAssistant:
             log_t("tts    done")
         finally:
             self.tts_playing.clear()
+            # D-01: fire-and-forget async extraction after TTS (D-02: only substantive)
+            if (self._memory and reply_text and user_text
+                    and reply_text != "(no response)"):
+                asyncio.ensure_future(self._extract_and_store_facts(user_text, reply_text))
+
+    # ------------------------------------------------------------------
+    # Memory-augmented message builder (D-07, D-08, MEMORY-03, MEMORY-04)
+    # ------------------------------------------------------------------
+
+    def _build_messages(self, user_text: str) -> list[dict]:
+        """Construct messages with memory-augmented system prompt."""
+        if self._memory is None:
+            # Fallback: no memory available
+            return [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_text},
+            ]
+
+        # Block 1: Profile facts (always present, ~500 tok max) — MEMORY-03
+        profile_facts = self._memory.get_profile_facts()
+        profile_block = ""
+        if profile_facts:
+            lines: list[str] = []
+            tok_count = 0
+            for f in profile_facts:
+                line = f"- {f['key']}: {f['value']}"
+                line_tokens = self._estimate_tokens(line)
+                if tok_count + line_tokens > self.cfg.memory_profile_max_tokens:
+                    break
+                lines.append(line)
+                tok_count += line_tokens
+            if lines:
+                profile_block = "## What you know about the user\n" + "\n".join(lines)
+
+        # Block 2: Semantic recall (per-turn, remaining budget) — MEMORY-04
+        profile_tokens = self._estimate_tokens(profile_block) if profile_block else 0
+        remaining = self.cfg.memory_total_max_tokens - profile_tokens
+        recall_max = min(remaining, self.cfg.memory_recall_max_tokens)
+
+        recall_block = ""
+        if recall_max > 50:  # Only bother if meaningful budget remains
+            recalled = self._memory.recall_similar(user_text, k=self.cfg.memory_top_k)
+            if recalled:
+                lines = []
+                tok_count = 0
+                for r in recalled:
+                    # MEMORY-05: tag uncertain results
+                    confidence = "" if r.get("confident", True) else " (uncertain)"
+                    ts = r.get("ts", "")[:10]  # date only
+                    content = r.get("content") or r.get("value", "")
+                    line = f"[{ts}]{confidence} {content}"
+                    line_tokens = self._estimate_tokens(line)
+                    if tok_count + line_tokens > recall_max:
+                        break
+                    lines.append(line)
+                    tok_count += line_tokens
+                if lines:
+                    recall_block = "## Relevant prior context\n" + "\n".join(lines)
+
+        # Compose system prompt
+        extended_system = SYSTEM_PROMPT
+        if profile_block:
+            extended_system += "\n\n" + profile_block
+        if recall_block:
+            extended_system += "\n\n" + recall_block
+
+        messages: list[dict] = [{"role": "system", "content": extended_system}]
+
+        # Short-term context: recent turns from DB (replaces self.history) — D-13
+        recent = self._memory.get_recent_turns(
+            n=self.cfg.memory_recent_turns, session_id=self._session_id
+        )
+        messages.extend(recent)
+
+        messages.append({"role": "user", "content": user_text})
+        return messages
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        """Word-count * 1.3 approximation (per research)."""
+        return int(len(text.split()) * 1.3) if text else 0
+
+    # ------------------------------------------------------------------
+    # Async fact extraction (D-01, D-02)
+    # ------------------------------------------------------------------
+
+    async def _extract_and_store_facts(self, user_text: str, reply_text: str) -> None:
+        """Background fact extraction. Best-effort, never crashes the loop."""
+        try:
+            loop = asyncio.get_event_loop()
+            messages = [
+                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"User said: {user_text}\nAssistant replied: {reply_text}"},
+            ]
+            resp = await loop.run_in_executor(None, self._brain.ask, messages, None)
+            text = resp.text.strip()
+            # Handle markdown-wrapped JSON
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            facts = json.loads(text)
+            if not isinstance(facts, list):
+                return
+            for fact in facts:
+                if not all(k in fact for k in ("type", "key", "value")):
+                    continue
+                supersedes_key = fact.get("supersedes_key")
+                self._memory.upsert_fact(
+                    fact["type"], fact["key"], fact["value"],
+                    "auto", supersedes_key
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).debug(f"Fact extraction failed: {exc}")
+
+    # ------------------------------------------------------------------
+    # Whisper transcription
+    # ------------------------------------------------------------------
 
     def _whisper_transcribe_array(self, audio: np.ndarray) -> str:
         """In-memory faster-whisper transcribe for the voice-first pipeline.
@@ -715,6 +874,8 @@ class JarvisAssistant:
                 pass
             if self._worker is not None:
                 self._worker.join(timeout=5)
+        if self._memory:
+            self._memory.close()
         self._audit_log.close()
         self.vision.stop()
 
@@ -779,7 +940,9 @@ class JarvisAssistant:
 
     def ask_ollama(self, prompt: str, image_data_url: str | None = None) -> str:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages.extend(self.history[-8:])
+        # D-12: self.history retired; recent turns loaded from DB when available
+        if self._memory:
+            messages.extend(self._memory.get_recent_turns(n=self.cfg.memory_recent_turns))
 
         user_message: dict[str, object] = {"role": "user", "content": prompt}
         if image_data_url:
@@ -804,9 +967,10 @@ class JarvisAssistant:
         data = response.json()
         reply = data["message"]["content"].strip()
 
-        self.history.append({"role": "user", "content": prompt})
-        self.history.append({"role": "assistant", "content": reply})
-        self.history = self.history[-16:]
+        # D-12: store turns in DB instead of in-memory history
+        if self._memory:
+            self._memory.store_turn("user", prompt, self._session_id)
+            self._memory.store_turn("assistant", reply, self._session_id)
         return reply
 
     # ------------------------------------------------------------------
