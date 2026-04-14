@@ -113,6 +113,9 @@ Guidelines for multi-step turns:
   summarise progress so far and offer to continue in the next turn.
 - After all steps complete, give the user a brief spoken summary of what
   was done, not a list of raw tool outputs.
+- If a tool is blocked (e.g. by the quarantine after reading external
+  content), explain why and ask the user to make that request in a fresh turn.
+- Never put credentials or private data into chat messages.
 """.strip()
 
 

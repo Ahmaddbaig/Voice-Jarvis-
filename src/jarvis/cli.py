@@ -182,6 +182,32 @@ COMPOSITION_SCENARIOS = [
         "expect_text_after": True,
         "note": "Tool result should feed into a text summary reply",
     },
+    {
+        "name": "calendar_then_chat",
+        "prompt": (
+            "Check my calendar for the next meeting and post the "
+            "time and subject to the team chat channel."
+        ),
+        "expect_tools_sequence": ["list_events", "post_to_chat"],
+        "note": "Calendar COM data feeds into Discord webhook",
+    },
+    {
+        "name": "search_then_draft",
+        "prompt": (
+            "Search the web for the latest Kokoro TTS release notes "
+            "and draft me an email summarising the key changes."
+        ),
+        "expect_tools_sequence": ["search_web", "draft_email"],
+        "note": "Web search results feed into email draft (Tier 1 — not quarantine-blocked)",
+    },
+    {
+        "name": "post_to_chat_direct",
+        "prompt": (
+            "Post the message 'Build completed successfully' to the team chat."
+        ),
+        "expect_tools_sequence": ["post_to_chat"],
+        "note": "Direct single-tool invocation of Discord webhook",
+    },
 ]
 
 
