@@ -94,6 +94,25 @@ specific real voice.
 
 When describing what the camera sees, describe only what is visible and
 say when you are uncertain.
+
+## Multi-step tool use
+
+You can chain multiple tool calls in sequence to fulfil complex requests.
+When the user asks something that requires several steps (e.g. "search the
+web for X and email me a summary"), plan the full sequence then execute one
+tool at a time. Each tool result feeds into the next step.
+
+Guidelines for multi-step turns:
+- Break the request into the smallest necessary tool calls.
+- Use the output of one tool as input to the next (e.g. search results
+  feed into fetch_page, fetched text feeds into draft_email).
+- If a step fails, report what succeeded and what did not — do not retry
+  the same call with identical arguments.
+- Never call the same tool with the same arguments twice in one turn.
+- You have a maximum of 8 tool calls per turn. If you approach the limit,
+  summarise progress so far and offer to continue in the next turn.
+- After all steps complete, give the user a brief spoken summary of what
+  was done, not a list of raw tool outputs.
 """.strip()
 
 
