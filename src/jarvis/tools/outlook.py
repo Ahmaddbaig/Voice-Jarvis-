@@ -149,3 +149,57 @@ def read_email(entry_id: str) -> str:
         )
 
     return _com_retry(_fetch)
+
+
+# ---------------------------------------------------------------------------
+# Email write tools (Tier 1 draft, Tier 2 send)
+# ---------------------------------------------------------------------------
+
+
+@tool(tier=1)
+def draft_email(to: str, subject: str, body: str) -> str:
+    """Draft an email and save it to the Drafts folder. Does NOT send.
+
+    Args:
+        to: Recipient email address(es), comma-separated for multiple.
+        subject: Email subject line.
+        body: Email body text.
+    """
+    app = _get_outlook()
+    if app is None:
+        return _DEGRADED_MSG
+
+    def _create():
+        mail = app.CreateItem(OL_MAIL_ITEM)
+        mail.To = to
+        mail.Subject = subject
+        mail.Body = body
+        mail.Save()  # Saves to Drafts -- does NOT send (D-05)
+        return f"Draft saved. draft_id: {mail.EntryID}  Subject: '{subject}'  To: {to}"
+
+    return _com_retry(_create)
+
+
+@tool(tier=2)
+def send_draft(draft_id: str) -> str:
+    """Send a previously drafted email. Requires draft_id from draft_email.
+
+    Args:
+        draft_id: The EntryID of the draft to send (from draft_email result).
+    """
+    app = _get_outlook()
+    if app is None:
+        return _DEGRADED_MSG
+
+    def _send():
+        ns = app.GetNamespace("MAPI")
+        try:
+            draft = ns.GetItemFromID(draft_id)
+        except Exception:
+            return "[error] Draft not found. It may have been deleted or moved from Drafts."
+        subj = draft.Subject
+        to = draft.To
+        draft.Send()
+        return f"Email sent. Subject: '{subj}' To: {to}"
+
+    return _com_retry(_send)
