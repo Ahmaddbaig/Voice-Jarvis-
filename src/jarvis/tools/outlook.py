@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from datetime import datetime, timedelta
 
 import pywintypes
 
@@ -203,3 +204,94 @@ def send_draft(draft_id: str) -> str:
         return f"Email sent. Subject: '{subj}' To: {to}"
 
     return _com_retry(_send)
+
+
+# ---------------------------------------------------------------------------
+# Calendar tools (Tier 0 read, Tier 1 create)
+# ---------------------------------------------------------------------------
+
+
+@tool(tier=0)
+def list_events(days_ahead: int = 7) -> str:
+    """List upcoming calendar events.
+
+    Args:
+        days_ahead: Number of days to look ahead (default 7, max 30).
+    """
+    app = _get_outlook()
+    if app is None:
+        return _DEGRADED_MSG
+    days_ahead = min(days_ahead, 30)
+
+    def _fetch():
+        ns = app.GetNamespace("MAPI")
+        cal = ns.GetDefaultFolder(OL_FOLDER_CALENDAR)
+        items = cal.Items
+        items.Sort("[Start]")
+        items.IncludeRecurrences = True  # MUST be after Sort
+        now = datetime.now()
+        end = now + timedelta(days=days_ahead)
+        restriction = (
+            f"[Start] >= '{now.strftime('%m/%d/%Y %I:%M %p')}' "
+            f"AND [Start] <= '{end.strftime('%m/%d/%Y %I:%M %p')}'"
+        )
+        restricted = items.Restrict(restriction)
+        lines = []
+        for i, item in enumerate(restricted):
+            if i >= 25:  # cap at 25 events
+                break
+            try:
+                loc = f"  Location: {item.Location}\n" if item.Location else ""
+                lines.append(
+                    f"{i+1}. {item.Subject}\n"
+                    f"   Start: {item.Start.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"   End:   {item.End.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"   {loc}"
+                    f"   ID: {item.EntryID}".rstrip()
+                )
+            except Exception:
+                continue
+        return "\n".join(lines) if lines else f"No events in the next {days_ahead} days."
+
+    return _com_retry(_fetch)
+
+
+@tool(tier=1)
+def create_event(title: str, when: str, duration_minutes: int = 60, location: str = "") -> str:
+    """Create a calendar event. Parses natural-language date/time for 'when'.
+
+    Args:
+        title: Event title/subject.
+        when: Natural-language date and time (e.g. 'next Thursday at noon', 'tomorrow 3pm').
+        duration_minutes: Duration in minutes (default 60).
+        location: Optional location string.
+    """
+    import dateparser
+
+    parsed = dateparser.parse(when, settings={"PREFER_DATES_FROM": "future"})
+    if parsed is None:
+        return f"[error] Could not parse date from '{when}'. Try 'next Thursday at 2pm' or 'tomorrow 3pm'."
+
+    app = _get_outlook()
+    if app is None:
+        return _DEGRADED_MSG
+
+    def _create():
+        appt = app.CreateItem(OL_APPOINTMENT_ITEM)
+        appt.Subject = title
+        appt.Start = parsed  # D-09: dateparser returns naive datetime; Outlook applies local TZ
+        appt.Duration = duration_minutes
+        if location:
+            appt.Location = location
+        appt.ReminderSet = True
+        appt.ReminderMinutesBeforeStart = 15
+        appt.Save()
+        return (
+            f"Event created: '{title}'\n"
+            f"  When: {parsed.strftime('%Y-%m-%d %H:%M')}\n"
+            f"  Duration: {duration_minutes} min\n"
+            f"  Location: {location or '(none)'}\n"
+            f"  ID: {appt.EntryID}"
+        )
+
+    return _com_retry(_create)
