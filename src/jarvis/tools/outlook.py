@@ -96,6 +96,7 @@ def list_inbox(count: int = 10) -> str:
     count = min(count, 25)
 
     def _fetch():
+        import pythoncom; pythoncom.CoInitialize()
         ns = app.GetNamespace("MAPI")
         inbox = ns.GetDefaultFolder(OL_FOLDER_INBOX)
         items = inbox.Items
@@ -131,6 +132,7 @@ def read_email(entry_id: str) -> str:
         return _DEGRADED_MSG
 
     def _fetch():
+        import pythoncom; pythoncom.CoInitialize()
         ns = app.GetNamespace("MAPI")
         try:
             item = ns.GetItemFromID(entry_id)
@@ -171,6 +173,7 @@ def draft_email(to: str, subject: str, body: str) -> str:
         return _DEGRADED_MSG
 
     def _create():
+        import pythoncom; pythoncom.CoInitialize()
         mail = app.CreateItem(OL_MAIL_ITEM)
         mail.To = to
         mail.Subject = subject
@@ -193,6 +196,7 @@ def send_draft(draft_id: str) -> str:
         return _DEGRADED_MSG
 
     def _send():
+        import pythoncom; pythoncom.CoInitialize()
         ns = app.GetNamespace("MAPI")
         try:
             draft = ns.GetItemFromID(draft_id)
@@ -224,6 +228,7 @@ def list_events(days_ahead: int = 7) -> str:
     days_ahead = min(days_ahead, 30)
 
     def _fetch():
+        import pythoncom; pythoncom.CoInitialize()
         ns = app.GetNamespace("MAPI")
         cal = ns.GetDefaultFolder(OL_FOLDER_CALENDAR)
         items = cal.Items
@@ -277,6 +282,7 @@ def create_event(title: str, when: str, duration_minutes: int = 60, location: st
         return _DEGRADED_MSG
 
     def _create():
+        import pythoncom; pythoncom.CoInitialize()
         appt = app.CreateItem(OL_APPOINTMENT_ITEM)
         appt.Subject = title
         appt.Start = parsed  # D-09: dateparser returns naive datetime; Outlook applies local TZ
