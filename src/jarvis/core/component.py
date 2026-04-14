@@ -267,3 +267,23 @@ class SearXNGComponent(_ComponentBase):
             self._status = "degraded"
             self._error = str(exc)
             return False
+
+
+class OutlookComponent(_ComponentBase):
+    """Probes Outlook COM availability at startup. Degraded if absent (D-13)."""
+
+    def __init__(self) -> None:
+        super().__init__("Mail")
+
+    def try_init(self) -> bool:
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+            import win32com.client
+            app = win32com.client.Dispatch("Outlook.Application")
+            _ = app.GetNamespace("MAPI")
+            return self._succeed()
+        except Exception as exc:
+            self._status = "degraded"
+            self._error = str(exc)
+            return False

@@ -33,6 +33,7 @@ from jarvis.core.component import (
     TTSComponent,
     CameraComponent,
     SearXNGComponent,
+    OutlookComponent,
 )
 
 
@@ -276,6 +277,7 @@ def preload_all(cfg: Config) -> tuple[PreloadedModels, ComponentRegistry]:
     registry.register(TTSComponent(kokoro_pipe, piper_voice))
     registry.register(CameraComponent(cfg.camera_index))
     registry.register(SearXNGComponent(cfg.searxng_url))
+    registry.register(OutlookComponent())
     registry.run_startup_checks()
 
     elapsed = time.perf_counter() - started
