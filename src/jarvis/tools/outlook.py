@@ -75,3 +75,77 @@ def _com_retry(fn, max_retries=3):
                 time.sleep(0.5 * (attempt + 1))
                 continue
             raise
+
+
+# ---------------------------------------------------------------------------
+# Email read tools (Tier 0)
+# ---------------------------------------------------------------------------
+
+
+@tool(tier=0)
+def list_inbox(count: int = 10) -> str:
+    """List recent inbox emails with subject, sender, date, and read status.
+
+    Args:
+        count: Number of recent emails to list (default 10, max 25).
+    """
+    app = _get_outlook()
+    if app is None:
+        return _DEGRADED_MSG
+    count = min(count, 25)
+
+    def _fetch():
+        ns = app.GetNamespace("MAPI")
+        inbox = ns.GetDefaultFolder(OL_FOLDER_INBOX)
+        items = inbox.Items
+        items.Sort("[ReceivedTime]", True)  # descending
+        lines = []
+        for i, item in enumerate(items):
+            if i >= count:
+                break
+            try:
+                status = "unread" if item.UnRead else "read"
+                lines.append(
+                    f"{i+1}. [{status}] {item.Subject}\n"
+                    f"   From: {item.SenderName}\n"
+                    f"   Date: {item.ReceivedTime.strftime('%Y-%m-%d %H:%M')}\n"
+                    f"   ID: {item.EntryID}"
+                )
+            except Exception:
+                continue
+        return "\n".join(lines) if lines else "Inbox is empty."
+
+    return _com_retry(_fetch)
+
+
+@tool(tier=0)
+def read_email(entry_id: str) -> str:
+    """Read the full content of an email by its ID.
+
+    Args:
+        entry_id: The EntryID of the email to read (from list_inbox results).
+    """
+    app = _get_outlook()
+    if app is None:
+        return _DEGRADED_MSG
+
+    def _fetch():
+        ns = app.GetNamespace("MAPI")
+        try:
+            item = ns.GetItemFromID(entry_id)
+        except Exception:
+            return "[error] Email not found. It may have been moved or deleted."
+        body = item.Body or ""
+        total_len = len(body)
+        if total_len > 4096:
+            body = body[:4096] + f"\n[...truncated at 4KB -- {total_len // 1024}KB total]"
+        mark_external_content()  # D-11: SAFE-04 quarantine
+        return (
+            f"Subject: {item.Subject}\n"
+            f"From: {item.SenderName}\n"
+            f"Date: {item.ReceivedTime.strftime('%Y-%m-%d %H:%M')}\n"
+            f"To: {item.To}\n\n"
+            f"{body}"
+        )
+
+    return _com_retry(_fetch)
