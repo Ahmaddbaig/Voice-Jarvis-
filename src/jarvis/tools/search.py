@@ -1,7 +1,7 @@
 """search_web -- Tier 0 read-only tool. Degrades gracefully without SearXNG."""
 import requests as http_requests
 
-from jarvis.tools._registry import tool
+from jarvis.tools._registry import tool, mark_external_content
 
 # SearXNG URL set by assistant.py at startup
 _searxng_url: str = "http://localhost:8888"
@@ -54,6 +54,8 @@ def search_web(query: str) -> str:
             url = r.get("url", "")
             if url:
                 _current_turn_urls.add(url)
+        # SAFE-04: Search results are external content — block Tier 2 for this turn
+        mark_external_content()
         lines = []
         for i, r in enumerate(results, 1):
             lines.append(f"{i}. {r.get('title', '(no title)')}")
