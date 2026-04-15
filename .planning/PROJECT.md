@@ -12,49 +12,43 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 
 ### Validated
 
-<!-- Shipped and confirmed valuable. -->
+<!-- Shipped and confirmed valuable in v1.0. -->
 
-- ✓ Text chat with a local LLM (gemma4:latest via Ollama) — existing (`src/jarvis.py`)
-- ✓ Always-on webcam vision, latest frame auto-attached to every request — existing (`ContinuousVision` class)
-- ✓ Spoken replies via local TTS (pyttsx3 / SAPI5) — existing
-- ✓ Push-to-talk mic capture with local transcription (faster-whisper) — existing, fully offline
-- ✓ Provider abstraction: swappable Ollama / OpenAI backends — existing
-- ✓ Ephemeral conversation history inside a single process run — existing
+- ✓ Text chat with a local LLM (gemma4 → OpenAI) — v1.0
+- ✓ Always-on webcam vision — v1.0
+- ✓ Spoken replies via Kokoro TTS (Piper fast-ack fallback) — v1.0
+- ✓ Wake-word activation ("Jarvis") + VAD-bounded recording — v1.0
+- ✓ Provider abstraction: Ollama / OpenAI via Brain.ask() — v1.0
+- ✓ Cross-session memory: SQLite + sqlite-vec semantic recall — v1.0
+- ✓ Tool framework: @tool decorator, 25+ tools, 3-tier safety, abort rail — v1.0
+- ✓ PC control: apps, windows, volume, clipboard, screenshot, shell — v1.0
+- ✓ Files: read/write/search/PDF with allow-list + quarantine — v1.0
+- ✓ Web search: SearXNG + trafilatura with URL allow-list — v1.0
+- ✓ Outlook: inbox, email, drafts, send (Tier 2), calendar — v1.0
+- ✓ Discord webhook: post_to_chat (Tier 2) — v1.0
+- ✓ Multi-step agent composition with 8-call loop cap — v1.0
+- ✓ Background tray process with graceful degradation matrix — v1.0
+- ✓ Barge-in, voice abort, sentence-streaming TTS — v1.0
 
 ### Active
 
-<!-- Current scope. Building toward daily-driver status. -->
+<!-- v2.0 scope: Human Presence + Computer Use -->
 
-**Brain & persona**
-- [ ] Persona refinement: terse, calm, polished "butler" with dry wit — tuned system prompt + conversation style
-- [ ] Iterable brain strategy — stay on gemma4 initially, evaluate larger local models (Llama 3.3, Qwen 2.5, tool-use-tuned variants) once tool calling is wired up
+**Human-like presence**
+- [ ] Natural voice with cadence, pauses, emotional modulation
+- [ ] Personality-rich responses — humor, warmth, contextual wit
+- [ ] Conversational memory flow — natural callbacks to prior topics
+- [ ] Fluid turn-taking — overlapping speech, backchannels, natural rhythm
 
-**Action layer (the biggest gap)**
-- [ ] Tool-use / function-calling framework so the LLM can invoke actions, not just describe them
-- [ ] **Control the PC**: launch/focus/close apps, basic window management, run shell commands, file read/write/search, volume + media control
-- [ ] **Web + knowledge**: live web search, fetch and summarize pages, current-info answers (weather, news, lookups)
-- [ ] **Personal data**: read PDFs / text files / notes on disk, email inbox access, calendar access
-- [ ] **Communication**: draft and send email, post to chat services on the user's behalf
-- [ ] A minimal safety rail so a destructive, irreversible action can still be aborted mid-flight (user has opted into "trust by default" but this is the one non-negotiable guard)
+**Computer-use agent**
+- [ ] Screenshot-based GUI understanding — see screen, identify elements
+- [ ] Vision-driven click/type/scroll — navigate any app without hardcoded automation
+- [ ] Multi-step GUI workflows — browser forms, system settings, any app
+- [ ] Self-correcting interaction loop — detect failures, adapt and retry
 
-**Persistent memory (first-class)**
-- [ ] Cross-session memory: who the user is, their preferences, recent conversations, ongoing projects
-- [ ] Memory is loaded into context on startup and updated as the conversation evolves — it is not a bolt-on afterthought
-- [ ] Storage stays local (SQLite / flat files / local vector store), no cloud sync
+## Current Milestone: v2.0 Human Presence + Computer Use
 
-**Voice loop upgrade**
-- [ ] Wake-word activation (say "Jarvis") replacing the terminal-bound `m` key
-- [ ] Always-listening pipeline: wake-word engine → VAD-bounded recording → local STT → brain → TTS
-- [ ] Natural turn-taking: stop recording when the user stops talking, not on a fixed 5-second timer
-- [ ] High-quality **local** TTS (XTTS-v2, Piper, or similar) replacing robotic SAPI5 — voice quality is a headline feature, not a detail
-
-**Vision**
-- [ ] Keep always-on webcam vision working end-to-end through the new action layer
-- [ ] "What am I looking at" / "read this screen" / "describe what's on my desk" as first-class commands
-
-**Reliability**
-- [ ] Runs as a background process with a stable hotkey/wake-word interface, not just a terminal REPL
-- [ ] Survives provider errors (Ollama down, whisper model missing, camera unplugged) without crashing the loop
+**Goal:** Transform Jarvis from a capable tool-calling assistant into a human-like conversational presence that can see and control any GUI through vision-based autonomous interaction.
 
 ### Out of Scope
 
@@ -70,11 +64,11 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 
 ## Context
 
-- **Starting point**: ~400 lines of Python in `src/jarvis.py`. Single file, two classes (`ContinuousVision`, `JarvisAssistant`), provider dispatch branching on `self.provider` at each call site. All features already work end-to-end: text, vision, mic, TTS, Ollama + OpenAI.
-- **Environment**: Windows 11, local Ollama install with `gemma4:latest` (8B Q4, ~9.6 GB) already pulled. faster-whisper `base` model (~145 MB) already cached. Python 3.12 in a project-local `.venv`.
-- **User profile**: The user built the prototype themselves and is comfortable running Python, editing `.env`, and installing Ollama models. They are the sole user and target audience — this is being built for them specifically, not for a general audience.
-- **Biggest felt pain today**: "It doesn't really DO anything — it just chats." That's the wound driving every priority below. Solving the action layer *is* the roadmap.
-- **Reference point**: Movie-JARVIS in vibe only. Not in look, voice, or branding. The existing system prompt is explicit about never impersonating the character or the actor.
+- **Current state**: v1.0 shipped. 6,235 lines of Python across `src/jarvis/` package (10 modules). 25+ tools across 7 domains. Background tray process with component health monitoring.
+- **Environment**: Windows 11, Python 3.12, OpenAI (primary), Ollama (local fallback). Kokoro TTS + Piper fast-ack. SearXNG in Docker for web search. Outlook COM for email/calendar.
+- **User profile**: The user built the prototype and is the sole operator. Comfortable with Python, .env config, Docker, Ollama models.
+- **v1.0 delivered**: The action layer is complete — Jarvis does things, not just chats. Voice loop, tool framework, PC control, memory, files, web, email, calendar, Discord, multi-step composition.
+- **Reference point**: Movie-JARVIS in vibe only. Not in look, voice, or branding.
 
 ## Constraints
 
@@ -90,14 +84,16 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| **Action layer first, better brain later** | User's top pain is "doesn't do anything." Model quality is the wrong thing to optimize before tool use works at all. | — Pending |
-| **Local high-quality TTS over cloud TTS** | "Voice is the whole point" + "no cloud lock-in" are both explicit user requirements. XTTS-v2 / Piper is the only way both can be true. | — Pending |
-| **Wake word over push-to-talk** | User explicitly wants always-listening, not `m`-key recording. Turns Jarvis from a terminal program into a real ambient assistant. | — Pending |
-| **Persistent memory is a first-class feature, not an add-on** | User flagged memory as "matters a lot" for daily-driver status. It needs to exist on day one of the memory phase, not be tacked on later. | — Pending |
-| **Trust-by-default autonomy with a hard abort rail** | User wants speed and naturalness over confirm-dialog friction. A mid-action abort is the minimum safety guarantee. | — Pending |
-| **Stay single-file as long as reasonably possible** | "Over-engineering" is an explicit anti-goal. Don't split into packages until a concrete feature needs it. | — Pending |
-| **Windows-primary, no cross-platform shims yet** | User is on Windows 11. Cross-platform work is an anti-goal at this stage. | — Pending |
-| **Ollama / faster-whisper stack stays** | Already working, already local, already cached. Changing the stack is wasted motion. | — Pending |
+| **Action layer first, better brain later** | User's top pain is "doesn't do anything." Model quality is the wrong thing to optimize before tool use works at all. | ✓ Good — 25+ tools shipped in v1.0 |
+| **Local high-quality TTS over cloud TTS** | "Voice is the whole point" + "no cloud lock-in" are both explicit user requirements. Kokoro + Piper is the answer. | ✓ Good — Kokoro primary, Piper fast-ack |
+| **Wake word over push-to-talk** | User explicitly wants always-listening, not `m`-key recording. | ✓ Good — openWakeWord + silero-vad shipped |
+| **Persistent memory is a first-class feature** | User flagged memory as "matters a lot" for daily-driver status. | ✓ Good — SQLite + sqlite-vec semantic recall |
+| **Trust-by-default with hard abort rail** | Speed over confirm dialogs. Abort is the minimum safety guarantee. | ✓ Good — hotkey + voice + barge-in abort |
+| **Package split at Phase 2** | Single-file through Phase 1, `jarvis/` package when tool registry needed it. | ✓ Good — clean split at the right time |
+| **Windows-primary** | User is on Windows 11. Cross-platform is not a goal. | ✓ Good — COM, pywin32, SAPI all used |
+| **Ollama / faster-whisper stack stays** | Already working, already local, already cached. | ✓ Good — stack preserved through v1.0 |
+| **3-tier tool safety with quarantine** | Tier 0/1/2 + SAFE-04 quarantine blocks Tier 2 after external content. | ✓ Good — caught real bug in Phase 8 UAT |
+| **Discord over Slack for v1.0 chat** | Simpler webhook, no OAuth needed. | ✓ Good — single requests.post() |
 
 ## Evolution
 
@@ -117,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after initialization*
+*Last updated: 2026-04-14 after v2.0 milestone start*
