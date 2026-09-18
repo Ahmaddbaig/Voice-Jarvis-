@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wake word, sees through the webcam, remembers its user across sessions, and *does things* — controlling the PC, searching the web, reading personal files, and communicating on the user's behalf — with a polished, genuinely pleasant voice. It is not a chatbot. It is a daily driver.
+A local, action-capable desktop AI assistant for Windows 11 and macOS. Jarvis listens on a wake word, sees through the webcam, remembers its user across sessions, and *does things* — controlling the PC, searching the web, reading personal files, and communicating on the user's behalf — with a polished, genuinely pleasant voice. It is not a chatbot. It is a daily driver.
 
 ## Core Value
 
@@ -32,23 +32,40 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 
 ### Active
 
-<!-- v2.0 scope: Human Presence + Computer Use -->
+<!-- v2.0 scope: Cross-Platform Personal Assistant — Hybrid Brain + Computer Use -->
+
+**Cross-platform core**
+- [ ] Jarvis boots and runs on macOS (fix hard `LOCALAPPDATA` dependency in load_config)
+- [ ] Shared core with OS-specific tool layers (pywin32/pycaw/winotify/Outlook COM on Windows; AppleScript/osascript/EventKit equivalents on macOS)
+- [ ] Feature parity for PC-control tools on both platforms (apps, windows, volume, clipboard, screenshot, notifications)
+
+**Hybrid brain**
+- [ ] Anthropic Claude provider via official `anthropic` Python SDK (claude-opus-4-8, adaptive thinking, native tool use) — replaces OpenAI
+- [ ] Local Ollama handles quick conversational turns; Claude handles hard multi-step tool-use turns
+- [ ] Per-turn routing logic decides local vs Claude
+
+**Computer-use agent**
+- [ ] Structured control preferred first — media keys, AppleScript, app APIs
+- [ ] Screenshot-based GUI understanding — see screen, identify elements (Claude vision)
+- [ ] Vision-driven click/type/scroll fallback — navigate any app without hardcoded automation
+- [ ] Self-correcting interaction loop — detect failures, adapt and retry
 
 **Human-like presence**
 - [ ] Natural voice with cadence, pauses, emotional modulation
 - [ ] Personality-rich responses — humor, warmth, contextual wit
 - [ ] Conversational memory flow — natural callbacks to prior topics
-- [ ] Fluid turn-taking — overlapping speech, backchannels, natural rhythm
 
-**Computer-use agent**
-- [ ] Screenshot-based GUI understanding — see screen, identify elements
-- [ ] Vision-driven click/type/scroll — navigate any app without hardcoded automation
-- [ ] Multi-step GUI workflows — browser forms, system settings, any app
-- [ ] Self-correcting interaction loop — detect failures, adapt and retry
+**Proactive assistant**
+- [ ] Reminders and scheduled briefings
+- [ ] Calendar awareness — surfaces upcoming events unprompted
 
-## Current Milestone: v2.0 Human Presence + Computer Use
+**Daily driver**
+- [ ] Autostart on login on both platforms
+- [ ] Always listening with low friction — no babysitting
 
-**Goal:** Transform Jarvis from a capable tool-calling assistant into a human-like conversational presence that can see and control any GUI through vision-based autonomous interaction.
+## Current Milestone: v2.0 Cross-Platform Personal Assistant — Hybrid Brain + Computer Use
+
+**Goal:** Turn Jarvis into a daily-driver personal assistant that runs on both Windows 11 and macOS, thinks with a hybrid local (Ollama) + Claude brain, and can operate any app — structured control first, vision-based computer use as fallback.
 
 ### Out of Scope
 
@@ -56,7 +73,7 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 
 - **Becoming cloud-dependent** — Cloud LLM/TTS/STT is allowed as an *optional override* for users who want it, but the default build must remain fully usable with zero internet. Cloud lock-in is an explicit failure mode.
 - **Shipping as a web app / Electron / browser UI** — Jarvis is a native desktop process, period. Any work that turns it into a web app is a wrong turn.
-- **Cross-platform parity on day one** — macOS and Linux are nice-to-haves. We will not hold back a Windows feature because it can't be made cross-platform today. Avoid hardcoding Windows-only paths where the alternative is trivial, but don't build cross-platform shims speculatively.
+- **Linux support** — v2.0 targets Windows 11 + macOS. Linux remains a nice-to-have; don't build shims for it speculatively. (Superseded in v2.0: the old "no cross-platform" exclusion — the user now runs macOS daily, so macOS parity is in scope.)
 - **Microservices / DI frameworks / premature abstractions** — The project is a single-file prototype today. Architectural complexity must earn its keep feature-by-feature. "Over-engineering" is an explicitly named failure mode.
 - **Voice impersonation of a specific actor** — The assistant is "polished butler," not "Paul Bettany's JARVIS." The current system prompt already encodes this constraint. We train/tune voice models and personas toward the *archetype*, not a specific real person.
 - **Image/video generation** — Jarvis consumes vision; it does not create images or video.
@@ -77,7 +94,7 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 - **Local storage only**: Memory, logs, cached models, recordings — all live on disk in the project directory or a local user folder. No cloud sync.
 - **Python + local models**: Stay on Python and the current Ollama / faster-whisper ecosystem. Rewrites in another language are not on the table.
 - **Minimal dependencies philosophy**: The project is a prototype; every new pip package needs a reason. Prefer stdlib and the few established libraries already in `requirements.txt`.
-- **Platform**: Windows 11 primary target. Don't build Windows-specific hacks where a trivially portable alternative exists, but prioritize "works on this machine" over "works everywhere."
+- **Platform**: Windows 11 and macOS are both first-class targets in v2.0. Shared core, OS-specific tool layers behind a platform abstraction. No Linux.
 - **Trust model**: The user has opted into "trust by default" — actions run without confirmation. The only hard floor is that the system must expose *some* way to abort a running destructive action (Ctrl-C, hotkey, or voice interrupt). Everything else proceeds.
 
 ## Key Decisions
@@ -94,6 +111,10 @@ A local, action-capable desktop AI assistant for Windows. Jarvis listens on a wa
 | **Ollama / faster-whisper stack stays** | Already working, already local, already cached. | ✓ Good — stack preserved through v1.0 |
 | **3-tier tool safety with quarantine** | Tier 0/1/2 + SAFE-04 quarantine blocks Tier 2 after external content. | ✓ Good — caught real bug in Phase 8 UAT |
 | **Discord over Slack for v1.0 chat** | Simpler webhook, no OAuth needed. | ✓ Good — single requests.post() |
+| **Claude replaces OpenAI as cloud brain (v2.0)** | Stronger multi-step tool use for an agentic assistant; official `anthropic` SDK, claude-opus-4-8, adaptive thinking. Local Ollama stays the offline default. | Pending — v2.0 |
+| **Hybrid per-turn brain routing (v2.0)** | Quick turns stay local (fast, free, private); hard multi-step tool work goes to Claude. | Pending — v2.0 |
+| **macOS becomes first-class (v2.0)** | User now develops and lives on a Mac; Windows-primary assumption no longer matches reality. | Pending — v2.0 |
+| **Structured control before computer use (v2.0)** | AppleScript/media keys/APIs are faster, cheaper, and more reliable than screenshot+click; vision-based control is the fallback, not the default. | Pending — v2.0 |
 
 ## Evolution
 
@@ -113,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 after v2.0 milestone start*
+*Last updated: 2026-07-05 after v2.0 scope expansion (cross-platform + hybrid Claude brain)*
